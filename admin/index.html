@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Statuspage Nội bộ</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header class="navbar">
+        <div class="nav-brand">Quản lý Statuspage</div>
+        <div class="nav-links">
+            <a href="https://drgdevlab.statuspage.io" target="_blank" rel="noopener noreferrer">Trang công khai</a>
+            <a href="https://drgdevlab.com/" target="_blank" rel="noopener noreferrer">Website</a>
+            <span id="user-info"></span>
+            <a href="/oauth2/sign_out">Đăng xuất</a>
+        </div>
+    </header>
+
+    <main class="container">
+        <div id="toast-container" role="status" aria-live="polite"></div>
+        
+        <section class="info-card">
+            <h2>Trạng thái dịch vụ của bạn</h2>
+            <p>Trạng thái sức khỏe được kiểm tra tự động. Bạn có thể sửa tên, mô tả, nhóm và link website tại đây. Để thêm hoặc thay đổi bài kiểm tra, xem <a href="https://github.com/devsecopslonghn/statuspage-platform" target="_blank" rel="noopener noreferrer">Kho mã nguồn (Repo)</a> để sửa cấu hình kiểm tra.</p>
+        </section>
+
+        <section class="card">
+            <h2>Cấu hình Trang (Page)</h2>
+            <form id="page-form">
+                <div class="form-group">
+                    <label for="page-name">Tên trang:</label>
+                    <input type="text" id="page-name" required maxlength="255">
+                </div>
+                <div class="form-group">
+                    <label for="page-url">Website URL (phải bắt đầu bằng https://):</label>
+                    <input type="url" id="page-url" pattern="https://.*" required maxlength="255">
+                </div>
+                <button type="submit" class="btn btn-primary" id="btn-save-page">Lưu cấu hình trang</button>
+            </form>
+        </section>
+
+        <section class="card">
+            <h2>Các sự cố hiện tại (Incidents)</h2>
+            <div id="incidents-list">Đang tải...</div>
+            <div style="margin-top: 10px;">
+                <a href="https://manage.statuspage.io/pages/hsyg2r4ql1pr/incidents" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Quản lý sự cố trên Statuspage</a>
+            </div>
+        </section>
+
+        <section class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 style="margin: 0; border: none; padding: 0;">Quản lý Thành phần (Components)</h2>
+                <button class="btn btn-secondary" id="btn-refresh">Làm mới Dữ liệu</button>
+            </div>
+            <div class="table-responsive">
+                <table id="components-table">
+                    <thead>
+                        <tr>
+                            <th>Tên</th>
+                            <th>Mô tả</th>
+                            <th>Nhóm</th>
+                            <th>Trạng thái</th>
+                            <th>Showcase (Lịch sử)</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="6">Đang tải...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Các bài kiểm tra đang cấu hình</h2>
+            <div class="table-responsive">
+                <table id="monitor-table">
+                    <thead>
+                        <tr>
+                            <th>Khóa (Key)</th>
+                            <th>Chế độ (Mode)</th>
+                            <th>Số lượng Check</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="3">Đang tải...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Lịch sử hoạt động (Audit Log)</h2>
+            <div class="table-responsive">
+                <table id="audit-table">
+                    <thead>
+                        <tr>
+                            <th>Thời gian (UTC)</th>
+                            <th>Người dùng</th>
+                            <th>Thao tác</th>
+                            <th>Mục tiêu</th>
+                            <th>Trường thay đổi</th>
+                            <th>Kết quả</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="6">Đang tải...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal cho Component -->
+    <dialog id="component-modal" class="modal" aria-labelledby="modal-title">
+        <div class="modal-content">
+            <h3 id="modal-title">Sửa Thành phần</h3>
+            <form id="component-form">
+                <input type="hidden" id="comp-id">
+                <input type="hidden" id="comp-is-group">
+                <div class="form-group">
+                    <label for="comp-name">Tên:</label>
+                    <input type="text" id="comp-name" required maxlength="255">
+                </div>
+                <div class="form-group">
+                    <label for="comp-desc">Mô tả (Chấp nhận website URL dạng văn bản thuần):</label>
+                    <textarea id="comp-desc" maxlength="5000"></textarea>
+                </div>
+                <div class="form-group" id="group-select-container">
+                    <label for="comp-group">Nhóm:</label>
+                    <select id="comp-group">
+                        <option value="">(Không có)</option>
+                    </select>
+                </div>
+                <div class="form-group checkbox-group" id="showcase-container">
+                    <input type="checkbox" id="comp-showcase">
+                    <label for="comp-showcase">Hiển thị lịch sử uptime</label>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn" id="btn-cancel-modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary" id="btn-save-comp">Xác nhận Lưu</button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+
+    <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,313 @@
+{
+  "page_id": "hsyg2r4ql1pr",
+  "public_url": "https://drgdevlab.statuspage.io",
+  "interval_seconds": 60,
+  "failure_threshold": 3,
+  "recovery_threshold": 2,
+  "listen_port": 8080,
+  "stale_seconds": 180,
+  "components": [
+    {
+      "key": "main-page",
+      "name": "DRG DevLab Website",
+      "id": "195v5r5s9g8f",
+      "mode": "internal",
+      "group": "Applications",
+      "checks": [
+        {
+          "type": "http",
+          "url": "https://drgdevlab.com/",
+          "expected_status": [
+            200
+          ]
+        }
+      ],
+      "failure_status": "major_outage",
+      "description": "Availability of the DRG DevLab website."
+    },
+    {
+      "key": "cr7allgoals",
+      "name": "CR7 All Goals",
+      "id": "q9lx0149j8cb",
+      "mode": "internal",
+      "group": "Applications",
+      "checks": [
+        {
+          "type": "http",
+          "url": "https://cr7allgoals.com/",
+          "expected_status": [
+            200
+          ]
+        },
+        {
+          "type": "http",
+          "url": "http://cr7allgoals-api.cr7allgoals.svc.cluster.local:8080/health/ready",
+          "expected_status": [
+            200
+          ],
+          "body_json_key": "status",
+          "body_json_value": "ok"
+        }
+      ],
+      "failure_status": "major_outage",
+      "description": "Website and application API availability."
+    },
+    {
+      "key": "card-credit",
+      "name": "Card Credit",
+      "id": "08ws9jnlz5t3",
+      "mode": "internal",
+      "group": "Applications",
+      "checks": [
+        {
+          "type": "http",
+          "url": "https://card-credit.apps.drgdevlab.com/",
+          "expected_status": [
+            200
+          ]
+        },
+        {
+          "type": "http",
+          "url": "http://card-credit-backend.card-credit.svc.cluster.local:3001/ready",
+          "expected_status": [
+            200
+          ],
+          "body_json_key": "status",
+          "body_json_value": "ready"
+        }
+      ],
+      "failure_status": "major_outage",
+      "description": "Card Credit website and application readiness."
+    },
+    {
+      "key": "fund-management",
+      "name": "Fund Management",
+      "id": "jdtsj532t9rl",
+      "mode": "internal",
+      "group": "Applications",
+      "checks": [
+        {
+          "type": "http",
+          "url": "https://quybpdev.apps.drgdevlab.com/",
+          "expected_status": [
+            200
+          ]
+        },
+        {
+          "type": "http",
+          "url": "http://fund-management-backend.fund-management.svc.cluster.local:8080/actuator/health",
+          "expected_status": [
+            200
+          ],
+          "body_json_key": "status",
+          "body_json_value": "UP"
+        }
+      ],
+      "failure_status": "major_outage",
+      "description": "Fund Management website and application readiness."
+    },
+    {
+      "key": "lol-analysis",
+      "name": "LoL Replay Analysis",
+      "id": "myvrnf2qgsmr",
+      "mode": "internal",
+      "group": "Applications",
+      "checks": [
+        {
+          "type": "http",
+          "url": "https://lol-analysis.apps.drgdevlab.com/",
+          "expected_status": [
+            200
+          ]
+        },
+        {
+          "type": "http",
+          "url": "http://lol-analysis-backend.lol-analysis.svc.cluster.local:8080/health/ready",
+          "expected_status": [
+            200
+          ],
+          "body_json_key": "status",
+          "body_json_value": "ok"
+        }
+      ],
+      "failure_status": "major_outage",
+      "description": "Replay analysis website and application readiness."
+    },
+    {
+      "key": "authentication",
+      "name": "Authentication",
+      "id": "lysmxt942h46",
+      "mode": "internal",
+      "group": "Platform",
+      "checks": [
+        {
+          "type": "http",
+          "url": "https://auth.apps.drgdevlab.com/realms/kubernetes/.well-known/openid-configuration",
+          "expected_status": [
+            200
+          ],
+          "body_json_key": "issuer",
+          "body_json_value": "https://auth.apps.drgdevlab.com/realms/kubernetes"
+        },
+        {
+          "type": "http",
+          "url": "http://keycloak.keycloak.svc.cluster.local:9000/health/ready",
+          "expected_status": [
+            200
+          ],
+          "body_json_key": "status",
+          "body_json_value": "UP"
+        }
+      ],
+      "failure_status": "major_outage",
+      "description": "Sign-in service discovery and readiness. Full interactive login is not tested."
+    },
+    {
+      "key": "cluster",
+      "name": "Kubernetes Control Plane",
+      "id": "dsyyn6d3vhg2",
+      "mode": "internal",
+      "group": "Platform",
+      "checks": [
+        {
+          "type": "prometheus",
+          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
+          "query": "up{job=\"kube-apiserver\"} and (time() - timestamp(up{job=\"kube-apiserver\"}) < 90)",
+          "comparison": "eq",
+          "threshold": 1,
+          "max_age_seconds": 90
+        },
+        {
+          "type": "prometheus",
+          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
+          "query": "kube_node_status_condition{condition=\"Ready\",status=\"true\"} and (time() - timestamp(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) < 90)",
+          "comparison": "eq",
+          "threshold": 1,
+          "max_age_seconds": 90
+        },
+        {
+          "type": "prometheus",
+          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
+          "query": "count(kube_node_status_condition{condition=\"Ready\",status=\"true\"} and (time() - timestamp(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) < 90))",
+          "comparison": "gte",
+          "threshold": 3,
+          "max_age_seconds": 90
+        }
+      ],
+      "failure_status": "degraded_performance",
+      "description": "Cluster API reachability and node readiness."
+    },
+    {
+      "key": "storage",
+      "name": "Persistent Storage",
+      "id": "m729fr7wf21t",
+      "mode": "internal",
+      "group": "Platform",
+      "checks": [
+        {
+          "type": "prometheus",
+          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
+          "query": "up{job=\"longhorn\"} and (time() - timestamp(up{job=\"longhorn\"}) < 90)",
+          "comparison": "eq",
+          "threshold": 1,
+          "max_age_seconds": 90
+        },
+        {
+          "type": "prometheus",
+          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
+          "query": "longhorn_volume_robustness{state=\"healthy\"} and (time() - timestamp(longhorn_volume_robustness{state=\"healthy\"}) < 90)",
+          "comparison": "eq",
+          "threshold": 1,
+          "max_age_seconds": 90
+        },
+        {
+          "type": "prometheus",
+          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
+          "query": "longhorn_volume_robustness{state=~\"degraded|faulted|unknown\"} and (time() - timestamp(longhorn_volume_robustness{state=~\"degraded|faulted|unknown\"}) < 90)",
+          "comparison": "eq",
+          "threshold": 0,
+          "max_age_seconds": 90
+        }
+      ],
+      "failure_status": "degraded_performance",
+      "description": "Storage service monitoring and volume health."
+    },
+    {
+      "key": "internet",
+      "name": "External Service Access",
+      "id": "6jddyclcvz2l",
+      "mode": "external",
+      "group": "Independent Monitoring",
+      "checks": [
+        {
+          "type": "http",
+          "url": "https://cr7allgoals.com/",
+          "expected_status": [
+            200
+          ]
+        },
+        {
+          "type": "http",
+          "url": "https://card-credit.apps.drgdevlab.com/",
+          "expected_status": [
+            200
+          ]
+        },
+        {
+          "type": "http",
+          "url": "https://quybpdev.apps.drgdevlab.com/",
+          "expected_status": [
+            200
+          ]
+        },
+        {
+          "type": "http",
+          "url": "https://lol-analysis.apps.drgdevlab.com/",
+          "expected_status": [
+            200
+          ]
+        }
+      ],
+      "failure_status": "major_outage",
+      "description": "Independent HTTPS checks from outside the cluster, normally every 30 minutes; scheduling may be delayed."
+    },
+    {
+      "key": "monitoring",
+      "name": "Status Monitoring",
+      "id": "b30lztzcbj7f",
+      "mode": "external",
+      "group": "Independent Monitoring",
+      "checks": [
+        {
+          "type": "http",
+          "url": "https://status-sync.apps.drgdevlab.com/healthz",
+          "expected_status": [
+            200
+          ],
+          "body_json_key": "ok",
+          "body_json_value": true
+        }
+      ],
+      "failure_status": "degraded_performance",
+      "description": "Freshness of status updates. If degraded, application statuses may reflect older observations."
+    }
+  ],
+  "metrics": [
+    {
+      "id": "9lb01w41wf34",
+      "name": "Service checks passing",
+      "kind": "checks_passing_percent",
+      "mode": "internal",
+      "suffix": "%",
+      "tooltip_description": "Percentage of synthetic and platform health checks passing in the latest observation; this is not an uptime SLA."
+    },
+    {
+      "id": "1fsdlgx3dykx",
+      "name": "Synthetic HTTP response time",
+      "kind": "http_latency_ms",
+      "mode": "internal",
+      "suffix": "ms",
+      "tooltip_description": "Mean response time of successful HTTP checks from the cluster; failed requests are excluded."
+    }
+  ]
+}

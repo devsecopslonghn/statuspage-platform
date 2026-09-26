@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.env
+*.key
+*.db
+*.db-*
+node_modules/

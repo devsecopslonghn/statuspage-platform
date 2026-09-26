@@ -1,0 +1,160 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: statuspage-admin-data
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn-workers
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: statuspage-admin
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels: {app: statuspage-admin}
+  template:
+    metadata:
+      labels: {app: statuspage-admin}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: admin
+          image: python:3.13-alpine@sha256:399babc8b49529dabfd9c922f2b5eea81d611e4512e3ed250d75bd2e7683f4b0
+          command: [python, -B, -u, /admin/server.py]
+          env:
+            - {name: PUBLIC_ORIGIN, value: 'https://status-admin.apps.drgdevlab.com'}
+            - {name: ADMIN_GROUP, value: /k8s-cluster-admins}
+            - {name: STATUSPAGE_API_KEY_FILE, value: /credentials/api-key}
+            - {name: ADMIN_CSRF_SECRET_FILE, value: /oauth/csrf-secret}
+            - {name: SYNC_MODULE_DIR, value: /app}
+            - {name: CONFIG_PATH, value: /config/config.json}
+            - {name: DATA_DIR, value: /data}
+          readinessProbe:
+            exec:
+              command: [python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/healthz', timeout=3)"]
+            periodSeconds: 15
+          livenessProbe:
+            exec:
+              command: [python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/healthz', timeout=3)"]
+            periodSeconds: 30
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 300m, memory: 192Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: admin-code, mountPath: /admin, readOnly: true}
+            - {name: sync-code, mountPath: /app, readOnly: true}
+            - {name: config, mountPath: /config, readOnly: true}
+            - {name: credentials, mountPath: /credentials, readOnly: true}
+            - {name: oauth, mountPath: /oauth, readOnly: true}
+            - {name: data, mountPath: /data}
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.2@sha256:aa0bd8dd5ab0c78e4c91c92755ad573a5f92241f88138b4141b8ec803463b4fd
+          args:
+            - --provider=keycloak-oidc
+            - --client-id=statuspage-admin
+            - --redirect-url=https://status-admin.apps.drgdevlab.com/oauth2/callback
+            - --oidc-issuer-url=https://auth.apps.drgdevlab.com/realms/kubernetes
+            - --scope=openid profile email
+            - --allowed-group=/k8s-cluster-admins
+            - --email-domain=*
+            - --code-challenge-method=S256
+            - --upstream=http://127.0.0.1:8081
+            - --http-address=0.0.0.0:4180
+            - --cookie-secure=true
+            - --cookie-samesite=lax
+            - --cookie-name=__Host-statuspage_oauth
+            - --cookie-expire=8h
+            - --cookie-refresh=5m
+            - --skip-provider-button=true
+            - --reverse-proxy=true
+            - --pass-user-headers=true
+            - --pass-access-token=false
+            - --pass-authorization-header=false
+            - --skip-auth-strip-headers=true
+            - --request-logging=false
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: statuspage-admin-oauth, key: client-secret}}
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom: {secretKeyRef: {name: statuspage-admin-oauth, key: cookie-secret}}
+          ports: [{name: proxy, containerPort: 4180}]
+          readinessProbe: {httpGet: {path: /ping, port: proxy}, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /ping, port: proxy}, periodSeconds: 30}
+          resources:
+            requests: {cpu: 25m, memory: 48Mi}
+            limits: {cpu: 250m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+      volumes:
+        - {name: admin-code, configMap: {name: statuspage-admin-code}}
+        - {name: sync-code, configMap: {name: statuspage-sync-code}}
+        - {name: config, configMap: {name: statuspage-sync-config}}
+        - name: credentials
+          secret: {secretName: statuspage-api-key, defaultMode: 0440}
+        - name: oauth
+          secret: {secretName: statuspage-admin-oauth, defaultMode: 0440}
+        - {name: data, persistentVolumeClaim: {claimName: statuspage-admin-data}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: statuspage-admin
+spec:
+  selector: {app: statuspage-admin}
+  ports: [{name: proxy, port: 4180, targetPort: proxy}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: statuspage-admin
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: status-admin.apps.drgdevlab.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: statuspage-admin, port: {number: 4180}}
+  tls:
+    - hosts: [status-admin.apps.drgdevlab.com]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: statuspage-admin
+spec:
+  podSelector:
+    matchLabels: {app: statuspage-admin}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ingress-nginx}
+      ports: [{protocol: TCP, port: 4180}]
+  egress:
+    - ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - ports: [{protocol: TCP, port: 443}]

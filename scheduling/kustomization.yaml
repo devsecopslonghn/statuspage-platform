@@ -1,0 +1,43 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+# Desired placement shares: master 40%, worker2 30%, worker1 30%.
+# These become relative scheduler scores; they are approximate across many pods.
+patches:
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment|StatefulSet
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: ignored-by-target
+      spec:
+        template:
+          spec:
+            tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
+            affinity:
+              nodeAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 40
+                    preference:
+                      matchExpressions:
+                        - key: kubernetes.io/hostname
+                          operator: In
+                          values: [k8s-master]
+                  - weight: 30
+                    preference:
+                      matchExpressions:
+                        - key: kubernetes.io/hostname
+                          operator: In
+                          values: [k8s-worker2]
+                  - weight: 30
+                    preference:
+                      matchExpressions:
+                        - key: kubernetes.io/hostname
+                          operator: In
+                          values: [k8s-worker1]
