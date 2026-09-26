@@ -79,7 +79,7 @@ Atlassian, nhưng reading nội bộ có thể stale. Quản trị Atlassian v�
 ## Audit, lưu trữ và backup
 
 Audit SQLite nằm trong PVC `statuspage-admin-data` 1Gi, StorageClass
-`longhorn-workers` (Retain, 2 replica). Deployment dùng Recreate. Volume giữ audit
+`longhorn-workers` (Retain, 2 replica). Deployment dùng Recreate và chỉ chạy trên hai worker có Longhorn CSI. Volume giữ audit
 qua restart; PVC được bảo vệ khỏi prune/delete bằng Argo annotation. Hai replica
 không thay cho backup off-cluster. Metadata chính nằm trên Atlassian, không ở SQLite.
 

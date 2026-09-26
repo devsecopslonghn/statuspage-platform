@@ -26,6 +26,14 @@ spec:
       annotations: {statuspage.drgdevlab.com/identity-revision: "2"}
     spec:
       automountServiceAccountToken: false
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values: [k8s-worker1, k8s-worker2]
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
