@@ -23,6 +23,7 @@ spec:
   template:
     metadata:
       labels: {app: statuspage-admin}
+      annotations: {statuspage.drgdevlab.com/identity-revision: "2"}
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -47,10 +48,12 @@ spec:
             exec:
               command: [python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/healthz', timeout=3)"]
             periodSeconds: 15
+            timeoutSeconds: 5
           livenessProbe:
             exec:
               command: [python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/healthz', timeout=3)"]
             periodSeconds: 30
+            timeoutSeconds: 5
           resources:
             requests: {cpu: 25m, memory: 64Mi}
             limits: {cpu: 300m, memory: 192Mi}
