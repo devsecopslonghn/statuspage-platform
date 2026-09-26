@@ -64,7 +64,8 @@ def main():
     secret = {'apiVersion': 'v1', 'kind': 'Secret',
         'metadata': {'name': 'statuspage-admin-oauth', 'namespace': 'statuspage'}, 'type': 'Opaque',
         'stringData': {'client-secret': client_secret,
-            'cookie-secret': keep('cookie-secret', base64.b64encode(secrets.token_bytes(32)).decode()),
+            'cookie-secret': base64.urlsafe_b64encode(base64.b64decode(
+                keep('cookie-secret', base64.b64encode(secrets.token_bytes(32)).decode()), altchars=b'-_')).decode(),
             'csrf-secret': keep('csrf-secret', secrets.token_hex(32))}}
     subprocess.run(['kubectl', 'apply', '--server-side', '--field-manager=statuspage-identity-bootstrap', '-f', '-'],
                    input=json.dumps(secret).encode(), check=True, stdout=subprocess.DEVNULL)

@@ -44,7 +44,7 @@ bind loopback8081 trong cùng pod. NetworkPolicy chỉ nhận từ ingress-nginx
 Đây là trang giới hạn bằng SSO, không phải endpoint chỉ có IP private/VPN.
 
 API chỉ cho sửa metadata được phép của đúng page `hsyg2r4ql1pr`. Không có generic
-API proxy. POST yêu cầu Origin đúng, JSON và token CSRF gắn với identity có hạn.
+API proxy. PATCH yêu cầu Origin đúng, JSON và token CSRF gắn với identity có hạn.
 Credential chỉ ở phía server. Các request không log cookie/token/API key.
 Public ingress heartbeat chỉ expose chính xác `/healthz`; `/metrics` không public.
 
