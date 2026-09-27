@@ -100,3 +100,21 @@ raw response/Secret vào Git. Không deploy mock/fake status để thử trong p
 - Chuyển namespace: chỉ một sync writer được chạy; dừng writer cũ trước khi bật
   writer mới, chuyển heartbeat và scrape target, kiểm tra rồi mới xóa tài nguyên cũ.
 - Không xóa namespace/PVC để xử lý lỗi triển khai thông thường.
+
+## Backup audit bằng SQLite online backup
+
+Thực hiện bằng quyền operator; ví dụ này không dừng phục vụ và không đọc Secret:
+
+```bash
+kubectl -n statuspage exec deployment/statuspage-admin -c admin -- \
+  python3 -c "import sqlite3; source=sqlite3.connect('/data/audit.db'); dest=sqlite3.connect('/data/audit-backup.sqlite'); source.backup(dest); dest.close(); source.close()"
+# Lấy tên pod từ kubectl -n statuspage get pods, rồi:
+kubectl -n statuspage cp <admin-pod>:/data/audit-backup.sqlite ./audit-backup.sqlite -c admin
+```
+
+File backup có identity người thao tác; lưu ngoài Git và giới hạn người đọc.
+Các file `scripts/verify_admin_browser.py` và `tests/` là công cụ tùy chọn, chỉ
+chạy khi được yêu cầu. Browser verifier tạo một user Keycloak tạm và xóa trong
+`finally`; không tạo incident hoặc gửi notification.
+
+Cilium reference: [host/node identity and namespace policy](https://docs.cilium.io/en/stable/network/kubernetes/policy/).
