@@ -38,14 +38,28 @@ private `devsecopslonghn/statuspage-platform`, namespace `statuspage`, hostname
 Codex điều phối và review cấu hình / diff / kết quả live. Antigravity được giao
 phần backend/UI và unit tests với model `gemini-3.1-pro-high`, effort high, nhóm
 quota Gemini (96% weekly / 97% 5h lúc giao); không dùng G1 credits.
-Lượt đầu CLI trả SUCCESS nhưng `denied_actions=RunCommand`, stderr cho biết shell
+Lượt Gemini đầu exit0, JSON SUCCESS nhưng `denied_actions=RunCommand`, stderr cho biết shell
 bị headless từ chối và chưa có file. Không coi lượt đó là hoàn thành; giao lại chỉ
-bằng file tools rồi coordinator kiểm thử actual implementation.
+bằng file tools (exit0, JSON SUCCESS, stderr trống). Coordinator review actual implementation, sửa API path, CSRF secret fail-closed, validation, lỗi HTTP, group API và CSP/refresh trước khi deploy.
 
 ## Bằng chứng nghiệm thu
 
-Được cập nhật sau khi rollout và kiểm tra live hoàn tất. Không dùng trạng thái CI
-hoặc manifest đơn lẻ để thay cho kiểm tra SSO, API write và runtime.
+- Repo private đã tạo, branch `main`, deploy key Argo chỉ đọc, không chứa credential.
+- 30 unit tests đã đạt trước khi người dùng bổ sung chỉ dẫn không chạy test nếu
+  chưa được yêu cầu. Sau chỉ dẫn đó không chạy thêm suite; CI tự động chỉ render,
+  unit test chuyển thành tùy chọn `workflow_dispatch.run_tests`.
+- Browser verifier chạy trước chỉ dẫn mới dừng ở lỗi truy cập public timeout;
+  user Keycloak tạm đã được xóa. Không ghi nhận full browser login/save là PASS.
+- Điều tra live xác định ingress-nginx hostNetwork trên node master không khớp
+  namespaceSelector của Cilium khi admin ở worker. Thêm Cilium policy host/node
+  trên đúng port4180/8080 và chỉ tin forwarded headers từ node ingress.
+- Public admin sau sửa trả302 tới đúng Keycloak client `statuspage-admin`, callback
+  đúng hostname; Keycloak trả200 và form đăng nhập thật.
+- Đọc API backend bằng quyền operator trong pod trả200, dữ liệu thật gồm10
+  components,3 groups và10 cấu hình monitor; API Secret không nằm trong response.
+- Pod admin Ready2/2, audit PVC Bound1Gi. Rollout đã sửa cookie secret thành
+  URL-safe base64 và required affinity chỉ worker vì master không có Longhorn CSI.
+- Cutover/cleanup cuối cùng và kết quả review được bổ sung bên dưới khi hoàn tất.
 
 ## Tài liệu tham khảo
 
@@ -53,3 +67,43 @@ hoặc manifest đơn lẻ để thay cho kiểm tra SSO, API write và runtime.
   component `showcase` là thuộc tính showcase/uptime, không dùng để hứa ẩn component.
 - [OAuth2 Proxy configuration](https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview/)
 - [Keycloak OIDC provider](https://github.com/oauth2-proxy/oauth2-proxy/blob/master/docs/docs/configuration/providers/keycloak_oidc.md)
+
+## Cutover hoàn tất
+
+- Root repo PR24: bootstrap staged application; PR25 merge
+  `b3db54949f24eaae30d46876dad3189fe0c2361d`: production source path `deploy`,
+  Prometheus target mới, bỏ code/workflow/docs trùng lặp ở repo cũ.
+- Repo riêng initial `1478ecb`; PR1 sửa cookie encoding/probe timeout, PR2 ràng
+  buộc worker CSI, PR3 `f66d8d63d67099bae864f3ab274f0167c11e5a0a` sửa hostNetwork
+  ingress và chuyển unit tests sang opt-in.
+- Đã xóa Application `statuspage-sync`, dừng và chờ pod sync cũ kết thúc trước
+  khi bật sync mới. Chuyển heartbeat host sang ingress namespace `statuspage`.
+- Hai Deployment `statuspage-admin` và `statuspage-sync` Ready1/1. Admin pod2/2,
+  API/config/audit lưu ở namespace mới. API backend đọc được dữ liệu public thật.
+- Sync mới qua các vòng debounce, cả8 component nội bộ Operational; metrics
+  cycles_failed=0 ở thời điểm kiểm tra. Public heartbeat HTTP200 và timestamp mới.
+- Prometheus target `statuspage-sync.statuspage.svc.cluster.local:8080` UP,
+  lastError rỗng. Prometheus đã rollout checksum5, không còn target namespace cũ.
+- Watchdog repo mới run [36290650215](https://github.com/devsecopslonghn/statuspage-platform/actions/runs/36290650215)
+  completed/success sau cutover. Run schedule36280902091 trước đó cũng success.
+- Xóa Service, NetworkPolicy, hai ConfigMap và API Secret Statuspage ở `monitoring`;
+  inventory hậu kiểm không còn resource tên `statuspage*` tại đó. Namespace
+  `monitoring` và workload giám sát khác được giữ nguyên.
+- Workflow cũ đã disable, file workflow đã xóa khỏi default branch; Actions Secret
+  cũ đã xóa. Repo mới có Secret riêng; chỉ còn một writer theo từng nhóm component.
+- Root, Statuspage và platform-observability Argo applications Synced/Healthy.
+- Production manifests render và server-side dry-run thành công sau cutover.
+- Bảy thay đổi có sẵn của người dùng trong worktree repo gốc được giữ nguyên.
+
+## Checklist nghiệm thu
+
+| Yêu cầu | Bằng chứng |
+|---|---|
+| Public Statuspage có link website | Page URL `https://drgdevlab.com/`; HTML public có anchor tới website |
+| Repo private chứa toàn bộ code/app Argo/docs | `devsecopslonghn/statuspage-platform`, main; README, argocd/application.yaml, deploy/, admin/, sync/, scripts/, docs/ |
+| Namespace riêng | Live `statuspage`: sync, admin, secrets, audit PVC; inventory cũ trống |
+| Trang quản trị nội bộ được bảo vệ | Public302 tới Keycloak client/callback riêng; login form200; OAuth group restriction, loopback backend, CSRF/field allowlists qua source review |
+| Dữ liệu thật và đồng bộ tiếp tục | Admin backend GET200 đọc10components/3groups; sync logs Operational, Prometheus UP, watchdog success |
+| Ghi nhận giới hạn xác minh | Full browser login/save chưa chạy lại sau chỉ dẫn không chạy tests; không ghi nhận E2E là PASS |
+
+Các lượt triển khai/rà soát và xử lý nhận xét chi tiết ở [REVIEW.md](REVIEW.md).
