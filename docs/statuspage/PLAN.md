@@ -9,8 +9,8 @@ the public status page outside Kubernetes. See [rollout evidence](VERIFICATION.m
 ## Scope and ownership
 
 Replace the domain directory with a curated service status page. The initial
-page has five application components (website, CR7, Card Credit, Fund Management,
-LoL Replay Analysis), Authentication, Kubernetes Control Plane, Persistent
+page has four application components (website, CR7, Card Credit, Fund Management),
+Authentication, Kubernetes Control Plane, Persistent
 Storage, External Service Access, and Status Monitoring. Component IDs and check
 definitions live in `statuspage-sync/config.json` and are reviewed through Git.
 New Ingress resources do not automatically become public components.

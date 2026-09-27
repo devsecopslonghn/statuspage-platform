@@ -93,7 +93,7 @@ spec:
             matchExpressions:
               - key: kubernetes.io/metadata.name
                 operator: In
-                values: [monitoring, card-credit, cr7allgoals, fund-management, lol-analysis, keycloak]
+                values: [monitoring, card-credit, cr7allgoals, fund-management, keycloak]
       ports:
         - {protocol: TCP, port: 8080}
         - {protocol: TCP, port: 3001}

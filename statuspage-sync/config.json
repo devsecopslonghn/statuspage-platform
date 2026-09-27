@@ -107,33 +107,6 @@
       "description": "Fund Management website and application readiness."
     },
     {
-      "key": "lol-analysis",
-      "name": "LoL Replay Analysis",
-      "id": "myvrnf2qgsmr",
-      "mode": "internal",
-      "group": "Applications",
-      "checks": [
-        {
-          "type": "http",
-          "url": "https://lol-analysis.apps.drgdevlab.com/",
-          "expected_status": [
-            200
-          ]
-        },
-        {
-          "type": "http",
-          "url": "http://lol-analysis-backend.lol-analysis.svc.cluster.local:8080/health/ready",
-          "expected_status": [
-            200
-          ],
-          "body_json_key": "status",
-          "body_json_value": "ok"
-        }
-      ],
-      "failure_status": "major_outage",
-      "description": "Replay analysis website and application readiness."
-    },
-    {
       "key": "authentication",
       "name": "Authentication",
       "id": "lysmxt942h46",
@@ -256,13 +229,6 @@
         {
           "type": "http",
           "url": "https://quybpdev.apps.drgdevlab.com/",
-          "expected_status": [
-            200
-          ]
-        },
-        {
-          "type": "http",
-          "url": "https://lol-analysis.apps.drgdevlab.com/",
           "expected_status": [
             200
           ]
