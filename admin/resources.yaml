@@ -96,6 +96,7 @@ spec:
             - --cookie-refresh=5m
             - --skip-provider-button=true
             - --reverse-proxy=true
+            - --trusted-proxy-ip=100.125.138.71/32
             - --pass-user-headers=true
             - --pass-access-token=false
             - --pass-authorization-header=false

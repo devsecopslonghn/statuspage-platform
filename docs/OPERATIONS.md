@@ -40,7 +40,7 @@ qua Git; cookie cũ có thể cần đăng nhập lại. API key được đọc
 
 Chỉ nhóm Keycloak `/k8s-cluster-admins` truy cập được. OAuth2 Proxy kiểm tra nhóm;
 backend kiểm tra identity/group lần nữa. Service chỉ expose proxy4180, backend
-bind loopback8081 trong cùng pod. NetworkPolicy chỉ nhận từ ingress-nginx.
+bind loopback8081 trong cùng pod. NetworkPolicy cho ingress-nginx; Cilium policy bổ sung traffic từ host/node trên đúng port4180 vì ingress-nginx chạy hostNetwork. Backend8081 không được expose. OAuth2 Proxy chỉ tin forwarded headers từ node ingress `100.125.138.71/32`.
 Đây là trang giới hạn bằng SSO, không phải endpoint chỉ có IP private/VPN.
 
 API chỉ cho sửa metadata được phép của đúng page `hsyg2r4ql1pr`. Không có generic

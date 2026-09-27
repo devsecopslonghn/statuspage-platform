@@ -14,7 +14,7 @@ Target page: hsyg2r4ql1pr, drgdevlab.statuspage.io. Namespace: statuspage.
   CSRF/Origin, field allowlists and sanitized API responses. Do not expose a generic
   Statuspage proxy or let clients choose management API hosts/page IDs.
 - Keep dependencies minimal; current application uses Python standard library.
-- Run python3 -m unittest discover -s tests and render kubectl kustomize deploy.
-  Check meaningful changed behavior, not only mocks. Verify live Argo and endpoints
+- Do not run tests unless the user explicitly asks. Review diffs and render
+  kubectl kustomize deploy for configuration changes. Verify live Argo and endpoints
   after deployment; no intentional public outage or subscriber test incidents.
 - Record changes, verification and limitations in docs/IMPLEMENTATION.md.
