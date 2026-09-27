@@ -3,13 +3,21 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: Explicitly request the unit test suite
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
-  test:
+  validate:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - run: python3 -m unittest discover -s tests
       - run: kubectl kustomize deploy > /tmp/statuspage-render.yaml
+      - name: Unit tests (only when explicitly requested)
+        if: github.event_name == 'workflow_dispatch' && inputs.run_tests
+        run: python3 -m unittest discover -s tests

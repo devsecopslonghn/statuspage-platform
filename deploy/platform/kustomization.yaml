@@ -5,4 +5,5 @@ components:
   - ../../scheduling
 resources:
   - namespace.yaml
+  - host-ingress-policy.yaml
   - health-ingress.yaml

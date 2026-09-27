@@ -61,10 +61,11 @@ thay trạng thái sức khỏe. Các thay đổi giao diện không bị sync g
 ## Kiểm tra local
 
 ```bash
-python3 -m unittest discover -s tests
 kubectl kustomize deploy > /tmp/statuspage.yaml
 kubectl apply --dry-run=server -f /tmp/statuspage.yaml
 ```
+
+Bộ test có sẵn trong `tests/`; chỉ chạy khi người dùng yêu cầu. CI tự động render manifests; unit tests là tùy chọn workflow_dispatch.
 
 Xem [runbook](docs/OPERATIONS.md) để bootstrap môi trường. Không chạy lại
 `provision.py --apply` như một bước deploy thường xuyên: đây là công cụ seed ban

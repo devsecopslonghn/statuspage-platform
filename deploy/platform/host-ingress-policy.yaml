@@ -1,0 +1,26 @@
+# ingress-nginx uses hostNetwork on the control-plane node. Cilium does not
+# match hostNetwork traffic with Kubernetes namespaceSelectors or ipBlock rules
+# in this cluster (policy-cidr-match-mode and node-selector-labels are disabled).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: statuspage-admin-host-ingress
+spec:
+  endpointSelector:
+    matchLabels: {app: statuspage-admin}
+  ingress:
+    - fromEntities: [host, remote-node, kube-apiserver]
+      toPorts:
+        - ports: [{port: "4180", protocol: TCP}]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: statuspage-sync-host-ingress
+spec:
+  endpointSelector:
+    matchLabels: {app: statuspage-sync}
+  ingress:
+    - fromEntities: [host, remote-node, kube-apiserver]
+      toPorts:
+        - ports: [{port: "8080", protocol: TCP}]
