@@ -51,6 +51,8 @@ spec:
             - {name: ADMIN_CSRF_SECRET_FILE, value: /oauth/csrf-secret}
             - {name: SYNC_MODULE_DIR, value: /app}
             - {name: CONFIG_PATH, value: /config/config.json}
+            - {name: INVENTORY_URL, value: http://statuspage-collector.statuspage.svc.cluster.local:8082/inventory}
+            - {name: DISCOVERY_CONFIG_PATH, value: /discovery/policy.json}
             - {name: DATA_DIR, value: /data}
           readinessProbe:
             exec:
@@ -73,6 +75,7 @@ spec:
             - {name: admin-code, mountPath: /admin, readOnly: true}
             - {name: sync-code, mountPath: /app, readOnly: true}
             - {name: config, mountPath: /config, readOnly: true}
+            - {name: discovery, mountPath: /discovery, readOnly: true}
             - {name: credentials, mountPath: /credentials, readOnly: true}
             - {name: oauth, mountPath: /oauth, readOnly: true}
             - {name: data, mountPath: /data}
@@ -121,6 +124,7 @@ spec:
         - {name: admin-code, configMap: {name: statuspage-admin-code}}
         - {name: sync-code, configMap: {name: statuspage-sync-code}}
         - {name: config, configMap: {name: statuspage-sync-config}}
+        - {name: discovery, configMap: {name: statuspage-discovery-config}}
         - name: credentials
           secret: {secretName: statuspage-api-key, defaultMode: 0440}
         - name: oauth
@@ -170,3 +174,15 @@ spec:
   egress:
     - ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
     - ports: [{protocol: TCP, port: 443}]
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: statuspage}
+          podSelector:
+            matchLabels: {app: statuspage-collector}
+      ports: [{protocol: TCP, port: 8082}]
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: statuspage}
+          podSelector:
+            matchLabels: {app: statuspage-sync}
+      ports: [{protocol: TCP, port: 8080}]

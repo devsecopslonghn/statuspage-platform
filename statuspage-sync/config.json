@@ -15,15 +15,13 @@
       "group": "Applications",
       "checks": [
         {
-          "type": "http",
-          "url": "https://drgdevlab.com/",
-          "expected_status": [
-            200
-          ]
+          "type": "inventory",
+          "key": "main-page"
         }
       ],
       "failure_status": "major_outage",
-      "description": "Availability of the DRG DevLab website."
+      "description": "Availability of the DRG DevLab website.",
+      "inventory_key": "main-page"
     },
     {
       "key": "cr7allgoals",
@@ -33,11 +31,8 @@
       "group": "Applications",
       "checks": [
         {
-          "type": "http",
-          "url": "https://cr7allgoals.com/",
-          "expected_status": [
-            200
-          ]
+          "type": "inventory",
+          "key": "cr7allgoals"
         },
         {
           "type": "http",
@@ -50,7 +45,8 @@
         }
       ],
       "failure_status": "major_outage",
-      "description": "Website and application API availability."
+      "description": "Website and application API availability.",
+      "inventory_key": "cr7allgoals"
     },
     {
       "key": "card-credit",
@@ -60,11 +56,8 @@
       "group": "Applications",
       "checks": [
         {
-          "type": "http",
-          "url": "https://card-credit.apps.drgdevlab.com/",
-          "expected_status": [
-            200
-          ]
+          "type": "inventory",
+          "key": "card-credit"
         },
         {
           "type": "http",
@@ -77,7 +70,8 @@
         }
       ],
       "failure_status": "major_outage",
-      "description": "Card Credit website and application readiness."
+      "description": "Card Credit website and application readiness.",
+      "inventory_key": "card-credit"
     },
     {
       "key": "fund-management",
@@ -87,11 +81,8 @@
       "group": "Applications",
       "checks": [
         {
-          "type": "http",
-          "url": "https://quybpdev.apps.drgdevlab.com/",
-          "expected_status": [
-            200
-          ]
+          "type": "inventory",
+          "key": "fund-management"
         },
         {
           "type": "http",
@@ -104,7 +95,8 @@
         }
       ],
       "failure_status": "major_outage",
-      "description": "Fund Management website and application readiness."
+      "description": "Fund Management website and application readiness.",
+      "inventory_key": "fund-management"
     },
     {
       "key": "authentication",
@@ -113,6 +105,10 @@
       "mode": "internal",
       "group": "Platform",
       "checks": [
+        {
+          "type": "inventory",
+          "key": "authentication"
+        },
         {
           "type": "http",
           "url": "https://auth.apps.drgdevlab.com/realms/kubernetes/.well-known/openid-configuration",
@@ -133,7 +129,8 @@
         }
       ],
       "failure_status": "major_outage",
-      "description": "Sign-in service discovery and readiness. Full interactive login is not tested."
+      "description": "Sign-in service discovery and readiness. Full interactive login is not tested.",
+      "inventory_key": "authentication"
     },
     {
       "key": "cluster",
@@ -259,5 +256,8 @@
       "suffix": "ms",
       "tooltip_description": "Mean response time of successful HTTP checks from the cluster; failed requests are excluded."
     }
-  ]
+  ],
+  "discovery": {
+    "enabled": true
+  }
 }

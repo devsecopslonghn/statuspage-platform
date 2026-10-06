@@ -29,6 +29,10 @@ spec:
           env:
             - name: STATUSPAGE_API_KEY_FILE
               value: /credentials/api-key
+            - name: INVENTORY_URL
+              value: http://statuspage-collector.statuspage.svc.cluster.local:8082/inventory
+            - name: DISCOVERY_CONFIG_PATH
+              value: /discovery/policy.json
           ports: [{name: http, containerPort: 8080}]
           startupProbe:
             tcpSocket: {port: http}
@@ -51,6 +55,7 @@ spec:
           volumeMounts:
             - {name: code, mountPath: /app, readOnly: true}
             - {name: config, mountPath: /config, readOnly: true}
+            - {name: discovery, mountPath: /discovery, readOnly: true}
             - {name: credentials, mountPath: /credentials, readOnly: true}
             - {name: cluster-ca, mountPath: /trust, readOnly: true}
       volumes:
@@ -61,6 +66,8 @@ spec:
           configMap: {name: statuspage-sync-code}
         - name: config
           configMap: {name: statuspage-sync-config}
+        - name: discovery
+          configMap: {name: statuspage-discovery-config}
         - name: credentials
           secret:
             secretName: statuspage-api-key
@@ -71,6 +78,7 @@ kind: Service
 metadata:
   name: statuspage-sync
 spec:
+  publishNotReadyAddresses: true
   selector: {app: statuspage-sync}
   ports: [{name: http, port: 8080, targetPort: http}]
 ---
@@ -88,6 +96,10 @@ spec:
             matchLabels: {kubernetes.io/metadata.name: ingress-nginx}
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: monitoring}
+      ports: [{protocol: TCP, port: 8080}]
+    - from:
+        - podSelector:
+            matchLabels: {app: statuspage-admin}
       ports: [{protocol: TCP, port: 8080}]
   egress:
     - ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
@@ -107,3 +119,9 @@ spec:
         - {protocol: TCP, port: 3001}
         - {protocol: TCP, port: 9000}
         - {protocol: TCP, port: 9090}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: statuspage}
+          podSelector:
+            matchLabels: {app: statuspage-collector}
+      ports: [{protocol: TCP, port: 8082}]

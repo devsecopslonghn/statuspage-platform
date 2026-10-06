@@ -1,0 +1,278 @@
+{
+  "version": 1,
+  "interval_seconds": 60,
+  "stale_seconds": 180,
+  "node_heartbeat_seconds": 600,
+  "timeout_seconds": 10,
+  "allowed_hosts": [
+    "drgdevlab.com",
+    "cr7allgoals.com",
+    "www.cr7allgoals.com"
+  ],
+  "allowed_host_suffixes": [
+    "apps.drgdevlab.com"
+  ],
+  "component_limit": null,
+  "component_limit_evidence": null,
+  "applications": [
+    {
+      "key": "main-page",
+      "name": "DRG DevLab Website",
+      "resources": [],
+      "publish": true,
+      "component_id": "195v5r5s9g8f",
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host",
+      "url": "https://drgdevlab.com/",
+      "source": "external"
+    },
+    {
+      "key": "cr7allgoals",
+      "name": "CR7 All Goals",
+      "resources": [
+        "cr7allgoals/cr7allgoals"
+      ],
+      "publish": true,
+      "component_id": "q9lx0149j8cb",
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host",
+      "url": "https://cr7allgoals.com/",
+      "alias_hosts": [
+        "www.cr7allgoals.com"
+      ]
+    },
+    {
+      "key": "card-credit",
+      "name": "Card Credit",
+      "resources": [
+        "card-credit/card-credit"
+      ],
+      "publish": true,
+      "component_id": "08ws9jnlz5t3",
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host",
+      "url": "https://card-credit.apps.drgdevlab.com/"
+    },
+    {
+      "key": "fund-management",
+      "name": "Fund Management",
+      "resources": [
+        "fund-management/fund-management",
+        "fund-management/fund-management-mcp"
+      ],
+      "publish": true,
+      "component_id": "jdtsj532t9rl",
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host",
+      "url": "https://quybpdev.apps.drgdevlab.com/"
+    },
+    {
+      "key": "authentication",
+      "name": "Authentication",
+      "resources": [
+        "keycloak/keycloak"
+      ],
+      "publish": true,
+      "component_id": "lysmxt942h46",
+      "expected_status": [
+        200
+      ],
+      "redirect": "deny",
+      "url": "https://auth.apps.drgdevlab.com/realms/kubernetes/.well-known/openid-configuration",
+      "assurance": "URL availability only; existing sync also validates OIDC issuer and internal readiness, not interactive login"
+    },
+    {
+      "key": "jenkins",
+      "name": "Jenkins",
+      "resources": [
+        "jenkins/jenkins"
+      ],
+      "publish": true,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host",
+      "url": "https://jenkins.apps.drgdevlab.com/",
+      "logo_url": "https://jenkins.apps.drgdevlab.com/static/10d8c838/images/svgs/logo.svg"
+    },
+    {
+      "key": "ingress/argocd/argocd-server",
+      "name": "Argo CD",
+      "resources": [
+        "argocd/argocd-server"
+      ],
+      "publish": false,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host"
+    },
+    {
+      "key": "ingress/bytebase/bytebase",
+      "name": "Bytebase",
+      "resources": [
+        "bytebase/bytebase"
+      ],
+      "publish": false,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host"
+    },
+    {
+      "key": "ingress/db-poc/db-poc",
+      "name": "Database POC",
+      "resources": [
+        "db-poc/db-poc"
+      ],
+      "publish": false,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host"
+    },
+    {
+      "key": "ingress/identity-console/console",
+      "name": "Identity Console",
+      "resources": [
+        "identity-console/console"
+      ],
+      "publish": false,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host"
+    },
+    {
+      "key": "ingress/identity-console/headlamp",
+      "name": "Headlamp",
+      "resources": [
+        "identity-console/headlamp"
+      ],
+      "publish": false,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host"
+    },
+    {
+      "key": "ingress/nebula-control/nebula-control-ui",
+      "name": "Nebula Control",
+      "resources": [
+        "nebula-control/nebula-control-ui"
+      ],
+      "publish": false,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host"
+    },
+    {
+      "key": "ingress/oceanbase-odc/oceanbase-odc",
+      "name": "OceanBase ODC",
+      "resources": [
+        "oceanbase-odc/oceanbase-odc"
+      ],
+      "publish": false,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host"
+    },
+    {
+      "key": "ingress/oracle-management/oracle-management",
+      "name": "Oracle Management",
+      "resources": [
+        "oracle-management/oracle-management"
+      ],
+      "publish": false,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host"
+    },
+    {
+      "key": "ingress/sonarqube/sonarqube",
+      "name": "SonarQube",
+      "resources": [
+        "sonarqube/sonarqube"
+      ],
+      "publish": false,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host"
+    },
+    {
+      "key": "ingress/statuspage/statuspage-admin",
+      "name": "Statuspage Admin",
+      "resources": [
+        "statuspage/statuspage-admin"
+      ],
+      "publish": false,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host",
+      "exclude_reason": "Admin SSO endpoint; excluded from synthetic application checks and public publication"
+    },
+    {
+      "key": "ingress/statuspage/statuspage-sync-health",
+      "name": "Statuspage Sync Heartbeat",
+      "resources": [
+        "statuspage/statuspage-sync-health"
+      ],
+      "publish": false,
+      "component_id": null,
+      "expected_status": [
+        200
+      ],
+      "redirect": "same_host",
+      "exclude_reason": "Independent watchdog owns monitoring; prevent recursive collector health checks"
+    }
+  ],
+  "nodes": [
+    {
+      "key": "node/k8s-master",
+      "name": "k8s-master",
+      "publish": true,
+      "component_id": null
+    },
+    {
+      "key": "node/k8s-worker1",
+      "name": "k8s-worker1",
+      "publish": true,
+      "component_id": null
+    },
+    {
+      "key": "node/k8s-worker2",
+      "name": "k8s-worker2",
+      "publish": true,
+      "component_id": null
+    }
+  ],
+  "allowed_private_addresses": {
+    "auth.apps.drgdevlab.com": [
+      "100.125.138.71"
+    ]
+  }
+}

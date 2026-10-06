@@ -13,7 +13,10 @@ page has four application components (website, CR7, Card Credit, Fund Management
 Authentication, Kubernetes Control Plane, Persistent
 Storage, External Service Access, and Status Monitoring. Component IDs and check
 definitions live in `statuspage-sync/config.json` and are reviewed through Git.
-New Ingress resources do not automatically become public components.
+New Ingress resources do not automatically become public components. The current
+discovery collector, node mapping and approval workflow are documented in
+[current operations](../OPERATIONS.md#discovery-url-và-từng-node); the architecture
+and namespace descriptions below are historical.
 
 An Argo CD-managed singleton Deployment in `monitoring` checks public HTTPS
 routes, internal backend readiness and existing Prometheus data every 60 seconds.

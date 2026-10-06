@@ -22,6 +22,8 @@ def main():
     args = parser.parse_args()
     config_path = Path(args.config)
     config = json.loads(config_path.read_text())
+    if args.apply and config.get('discovery', {}).get('enabled'):
+        raise SystemExit('Discovery active: use provision_discovery.py; legacy seed would overwrite admin metadata/groups')
     if config['page_id'] != 'hsyg2r4ql1pr':
         raise SystemExit('Unexpected target page')
     key_path = os.environ['STATUSPAGE_API_KEY_FILE']

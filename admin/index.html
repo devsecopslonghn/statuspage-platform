@@ -73,6 +73,18 @@
         </section>
 
         <section class="card">
+            <h2>Inventory ứng dụng và Kubernetes node</h2>
+            <p id="inventory-summary">Đang tải nguồn dữ liệu...</p>
+            <p>Ứng dụng mới giữ trong inventory nội bộ cho tới khi được duyệt qua cấu hình Git và gắn component. URL availability không xác nhận nghiệp vụ; bảng bên trên là trạng thái public sau debounce và ưu tiên incident/maintenance.</p>
+            <div class="table-responsive">
+                <table id="inventory-table">
+                    <thead><tr><th>Ứng dụng / Node</th><th>URL và endpoint</th><th>Nguồn / Lần thấy cuối</th><th>Check / Mức bảo đảm</th><th>Quan sát / Lý do</th><th>Công bố / Component</th></tr></thead>
+                    <tbody><tr><td colspan="6">Đang tải...</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card">
             <h2>Các bài kiểm tra đang cấu hình</h2>
             <div class="table-responsive">
                 <table id="monitor-table">

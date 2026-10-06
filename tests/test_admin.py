@@ -64,6 +64,16 @@ class AdminHTTPTests(unittest.TestCase):
         self.assertEqual(self.request('GET','/healthz',headers={})[0],200)
         self.api._request.assert_not_called()
 
+    def test_inventory_route_keeps_group_gate_and_does_not_need_management_api(self):
+        with patch('server.fetch_discovery_inventory', return_value={'available':False,'rows':[]}):
+            for headers, code in [({},401), ({**self.headers,'X-Forwarded-Groups':'/k8s-viewers'},403)]:
+                self.assertEqual(self.request('GET','/api/inventory',headers=headers)[0],code)
+            code, headers, body = self.request('GET','/api/inventory')
+            self.assertEqual(code,200)
+            self.assertEqual(json.loads(body)['available'],False)
+            self.assertEqual(headers['Cache-Control'],'no-store')
+        self.api._request.assert_not_called()
+
     def test_csrf_identity_expiry_and_secret_required(self):
         t=server.generate_csrf_token('operator|admin@example.com')
         self.assertTrue(server.validate_csrf_token(t,'operator|admin@example.com'))

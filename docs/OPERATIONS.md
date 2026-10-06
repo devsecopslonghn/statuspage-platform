@@ -5,7 +5,9 @@
 Namespace `statuspage` giữ sync, admin, API Secret, OAuth Secret và audit PVC.
 NetworkPolicy `allow-statuspage-probes` ở bốn namespace ứng dụng chỉ cho pod
 `app=statuspage-sync` trong namespace `statuspage` gọi TCP readiness port tương ứng.
-Không cấp Kubernetes ServiceAccount token hoặc RBAC cho workload.
+Sync/admin không có Kubernetes ServiceAccount token hoặc RBAC. Collector riêng
+chỉ có get/list/watch Ingress và Node; không có Statuspage key, quyền Secret hay
+quyền ghi Kubernetes.
 
 Argo Application chuẩn ở `argocd/application.yaml`. Root Application của cụm vẫn
 thuộc `devsecopslonghn/k8s-namepsace-chart`: nó giữ bản bootstrap Application và
@@ -51,8 +53,9 @@ Public ingress heartbeat chỉ expose chính xác `/healthz`; `/metrics` không 
 ## Sửa check hoặc thêm dịch vụ
 
 Check definition tại `statuspage-sync/config.json` dùng component ID ổn định.
-Khi thêm dịch vụ: tạo component ở Atlassian, lấy ID; thêm check và group metadata
-vào config; bổ sung egress/probe policy nếu cần; PR + test + review rồi merge.
+Ứng dụng/Node được collector khám phá vào inventory nội bộ. Khi công bố thêm,
+dùng quy trình discovery bên dưới để duyệt policy và provision/adopt ID ổn định;
+backend readiness chỉ thêm khi có endpoint thật đã xác minh.
 Không xóa/recreate component đang dùng vì sẽ mất ánh xạ và history.
 Tên/mô tả hiện tại trên Atlassian là nguồn metadata; config giữ thông tin seed.
 `provision.py --apply` dành cho bootstrap có backup, có thể reset metadata;
@@ -68,8 +71,9 @@ curl -fsS https://status-sync.apps.drgdevlab.com/healthz
 gh run list --repo devsecopslonghn/statuspage-platform --workflow statuspage-external.yml
 ```
 
-Prometheus scrape `statuspage-sync.statuspage.svc.cluster.local:8080/metrics`.
-Counters: `statuspage_sync_cycles_total`, `statuspage_sync_cycles_failed_total`,
+Namespace monitoring/Prometheus đã chủ đích gỡ. Counters nội bộ tại
+`statuspage-sync.statuspage.svc.cluster.local:8080/metrics` vẫn dùng để chẩn đoán:
+ `statuspage_sync_cycles_total`, `statuspage_sync_cycles_failed_total`,
 `statuspage_sync_last_success_timestamp_seconds`. Nếu heartbeat stale >180 giây,
 watchdog ngoài cụm có thể đánh dấu Status Monitoring lỗi. Workflow lịch 30 phút
 có thể bị GitHub trì hoãn; theo dõi run history và Actions quota. Nó không phải SLA.
@@ -155,3 +159,160 @@ chạy khi được yêu cầu. Browser verifier tạo một user Keycloak tạm
 `finally`; không tạo incident hoặc gửi notification.
 
 Cilium reference: [host/node identity and namespace policy](https://docs.cilium.io/en/stable/network/kubernetes/policy/).
+
+## Discovery URL và từng node
+
+### Nguồn, quyền và phạm vi
+
+`statuspage-collector` singleton trong namespace `statuspage` LIST paginated
+Ingress/Node mỗi60giây. ClusterRole chỉ get/list/watch hai resource này, không
+Secret, Lease hoặc write. Token projected3600giây được đọc lại từng request;
+HTTPS Kubernetes xác minh cluster CA và cấm redirect. Collector không mount
+Statuspage credential. Sync/admin không có token Kubernetes; chúng đọc endpoint
+cố định `http://statuspage-collector.statuspage.svc.cluster.local:8082/inventory`.
+Không có Ingress public cho collector; NetworkPolicy chỉ nhận từ sync/admin.
+Service dùng `publishNotReadyAddresses` để dữ liệu lỗi vẫn được đọc và chẩn đoán
+khi collector readiness503. Admin inventory vẫn đọc được nếu Manage API lỗi.
+
+Inventory SQLite trên PVC riêng1Gi `longhorn-workers`, Recreate, Retain và
+Prune=false/Delete=false, giữ tombstone qua restart. Sao lưu bằng SQLite online
+backup API giống audit DB, path `/data/inventory.db`; không xóa PVC để refresh.
+Collector restart đánh dấu observation persisted stale cho tới khi list/probe mới.
+ConfigMap policy/code có hash để đổi policy rollout tất cả consumer.
+
+Policy `collector/policy.json` là nguồn duyệt, không tin annotation để tự public:
+
+- `applications[].resources` nhóm nhiều Ingress vào một key; `url` chọn canonical
+  (host phải còn có trong Ingress), `alias_hosts` khai báo alias; các route khác là
+  endpoint phụ và không tự thành component/check riêng. Key không dựa UID để
+  recreate tài nguyên cùng tên giữ mapping. Không suy đoán hai Ingress khác ứng
+  dụng là cùng service; inventory mới cần owner review grouping.
+- `publish:false` mặc định cho tài nguyên mới và endpoint admin/private. Nó vẫn
+  được inventory/probe nội bộ nếu URL an toàn. `exclude_reason` giữ entry giải
+  thích việc không probe; admin/heartbeat Statuspage là hai exclusion hiện tại.
+- `name`, `url`, `expected_status`, `redirect`, `redirect_hosts`, `assurance` là
+  override được review; `source:external` hỗ trợ URL ngoài Kubernetes. `logo_url`
+  chỉ là tham chiếu tài nguyên tĩnh, không dùng làm backend health.
+- `publish:true` + `component_id` mới cho phép sync ghi status. ID hiện hữu được
+  giữ; không xóa/recreate component/history. Tài nguyên mới tự xuất hiện nhưng
+  không tự public. `retired:true` + `retirement_reason` dừng health writer, giữ ID
+  và lịch sử, admin hiện retired; Statuspage không có enum retired nên status cũ
+  được giữ và operator cập nhật mô tả retirement bằng admin nếu cần. Missing
+  không đồng nghĩa retired.
+
+Canonical URL phải HTTPS, không credential/query/fragment/port lạ, không IP
+literal, traversal hoặc path regex. Scope: đúng `drgdevlab.com`, `cr7allgoals.com`,
+`www.cr7allgoals.com` và subdomain `apps.drgdevlab.com`. DNS IP public được kiểm
+tra rồi pin khi kết nối, TLS vẫn xác minh hostname/SNI. Mọi redirect được kiểm
+tra lại host/IP; `deny` mặc định, `same_host` tối đa5hop, `allowlisted` cần duyệt
+`redirect_hosts` cho SSO. Query SSO không được xuất/log. CoreDNS live trỏ Auth
+về `100.125.138.71`: chỉ cặp `auth.apps.drgdevlab.com`/IP này được ngoại lệ private
+trong policy, Cilium cho host/node TCP443 để tới ingress. Không cho loopback,
+link-local hoặc IP private bất kỳ. Chuyển ingress cần cập nhật ngoại lệ đúng IP.
+
+Mỗi probe là HTTPS GET URL thật, default HTTP200, check TLS, deadline10giây;
+worker subprocess bị kill khi hết hạn (cả DNS/TLS/headers). Check availability
+chỉ xét response status, không chứng minh backend/nghiệp vụ. Redirect tới login
+và HTTP200 chỉ chứng minh route/login reachable. Expected403 cần được owner duyệt
+và đổi assurance thành access-policy/reachability, không coi là app health.
+Backend readiness của CR7/Card Credit/Fund/Auth giữ endpoint thật đã có; không
+khôi phục Prometheus/namespace monitoring, không đoán health URL.
+
+### Mapping trạng thái và debounce
+
+| Quan sát | Statuspage raw status | Lý do |
+|---|---|---|
+| URL đúng expected status; Node Ready=True, pressure=False, heartbeat mới | operational | URL availability hoặc ready_no_pressure, phạm vi check được nêu |
+| URL lỗi/TLS/timeout/status sai; Node Ready=False | major_outage | HTTP/TLS/deadline hoặc not_ready |
+| Có check thành công và backend/URL check thất bại | partial_outage | Partial check failure |
+| Ready Unknown/thiếu; pressure True/Unknown/thiếu; NetworkUnavailable True | degraded_performance | Condition tương ứng |
+| Ingress/Node mất, API lỗi, snapshot >180giây, Node heartbeat >600giây hoặc tương lai >30giây | degraded_performance | missing/source_unavailable/stale, không healthy |
+| Cordon nhưng Ready/pressure/heartbeat tốt | operational | cordoned được hiện riêng, không phải node hỏng |
+| Retired có lý do được duyệt | Không ghi health nữa | Giữ history, không biến mất thành healthy |
+
+Heartbeat của Node lấy `lastHeartbeatTime` từ Ready và ba pressure conditions,
+ngưỡng600giây vì Node status có thể cập nhật khoảng5phút; không cấp quyền Lease.
+Quan sát LIST Node mới có thể chứa heartbeat cũ và vẫn bị degrade. Controller
+Ready Unknown/False được đọc trực tiếp, không thay bằng `/readyz`/Longhorn.
+Admin đọc thêm sync `/observations` nội bộ để hiện raw/final status, debounce,
+check results, lý do readiness/content failure và manual incident/maintenance.
+Endpoint này không có public Ingress; sync Service cũng phục vụ pod chưa Ready
+để trạng thái lỗi vẫn có thể đọc; admin egress8080 và sync ingress8080 giới hạn
+pod admin. Telemetry quá180giây hiển thị stale, không suy đoán final status mới.
+
+Nguồn Ingress/Node lỗi được tách riêng; phần còn đọc được vẫn có inventory.
+
+Ba quan sát lỗi riêng mới đổi status; hai healthy riêng mới phục hồi. Đọc lại
+cùng timestamp không tăng failure/recovery counters. Local cycle phát hiện
+source unavailable/stale là một quan sát unknown riêng; debounce vẫn áp dụng.
+Startup state unknown, incident/maintenance (kể cả page-wide) thắng và reset
+counters; kết thúc incident cần đủ sample mới. Dữ liệu stale/malformed/unavailable
+làm heartbeat sync503 để watchdog nhận mất assurance. URL outage có dữ liệu hợp
+lệ không tự làm heartbeat fail. GitHub watchdog vẫn chỉ sở hữu Internet/Monitoring.
+
+### Provision/adopt component, capacity và triển khai
+
+Page live có9components +3groups tại snapshot2026-10-06. Management GET page
+không có trường plan/limit. Tài liệu [Atlassian component](https://support.atlassian.com/statuspage/docs/create-a-component/)
+ghi ceiling1100, [pricing](https://www.atlassian.com/software/statuspage/pricing)
+ghi Free public25; không suy đoán page hiện dùng Free. API có pacing1request/giây/
+token; client pacing1,5giây/request và backoff420/429/5xx, pagination100/page có
+bounded limit. Admin/sync cùng key có thể gặp429; không hứa global pacing giữa pod.
+
+Operator xác minh actual plan trên Billing, ghi `component_limit` và
+`component_limit_evidence` (gói, thời điểm, nguồn). Provisioner đếm bảo thủ cả
+group và component;9+3hiện tại cùng4record mới=16slot, cần capacity ít nhất16
+trừ khi đã xác minh quota không tính group. Không tạo/xóa để tự giải phóng quota.
+Jenkins và ba node là4mapping pending ID. Các endpoint private khác không duyệt.
+
+Quy trình dưới đây chỉ chạy sau khi người dùng cho phép external write/deploy:
+
+1. Review policy/capacity, snapshot collector mới (JSON version1), component ID
+   có sẵn. Có thể thu snapshot bằng local collector code với Ingress/Node GET
+   của operator trước deploy; không cần Statuspage key cho bước discovery.
+2. Chạy preview read-only:
+
+   ```bash
+   STATUSPAGE_API_KEY_FILE=/private/path/key python3 statuspage-sync/provision_discovery.py \
+     --config statuspage-sync/config.json --policy collector/policy.json \
+     --snapshot /private/path/fresh-inventory.json
+   ```
+
+3. Sau khi duyệt action list, thêm `--apply --output /private/path/mapped-policy.json`.
+   Chỉ tạo/adopt record được duyệt, initial degraded để không xanh khi bootstrap;
+   không sửa metadata đã có, group, incident, notification hoặc xóa component.
+   POST không retry khi kết quả mơ hồ; chạy GET/preview để tìm marker identity
+   trước thử lại. Registry output ghi atomic sau từng ID trả về; copy/merge mapping
+   về policy Git để giữ identity. Có component cùng tên nhưng thiếu marker/ID:
+   dừng để operator gắn ID thật; không recreate. Giữ marker khi mapping chưa vào
+   Git. Component có ID vẫn dùng ID dù admin đổi tên/mô tả.
+4. Render/review production/staging; staging writer replicas0. Deploy GitOps sau
+   khi được phép, kiểm tra collector RBAC/NetworkPolicy/DNS trong pod, inventory,
+   Nodeconditions, debounce, admin SSO và heartbeat. Không thử outage production.
+   Bootstrap/AppProject live đã allow repo/ClusterRole/ClusterRoleBinding, không
+   cần đổi root repo cho collector. Root checkout hiện có drift cũ, không sửa trong
+   patch này; review source allowlist trước rollout nếu dùng checkout đó.
+
+Legacy `provision.py --apply` bị chặn khi discovery active vì seed cũ có thể
+reset metadata/group. Admin sửa metadata như trước; sync chỉ PATCH status/metrics.
+Statuspage component API không có per-component URL/icon field; provision lưu
+URL/logo trong description và admin hiện tham chiếu. Mô tả hiện bằng tooltip `?`,
+không hứa clickable directory hoặc icon trên public page. Custom HTML trên
+`*.statuspage.io` không được hiển thị theo [Atlassian docs](https://support.atlassian.com/statuspage/docs/use-custom-html-on-a-status-page/);
+nếu cần click-to-open/icon public cần quyết định UI/domain riêng sau task này.
+
+### Giao diện cho bước ticket tiếp theo
+
+Chưa kết nối ticket service. Nguồn đề xuất là transition **sau debounce và sau
+Statuspage PATCH thành công**, không phải raw HTTP failure. Event contract v1:
+`event_id`, `inventory_key`, `component_id`, `source`, `observed_at`,
+`previous_status`, `status`, `reason`, `check_type`, `assurance`, `writer=sync`,
+`incident_precedence`, `verification_reference`. Consumer sau này cần durable
+outbox/idempotency và correlation theo inventory key + episode; stdout hiện tại
+chỉ là observation log, chưa là delivery contract đảm bảo.
+
+Luồng: `health_failure` -> adapter ticket/incident của hệ thống do owner chọn
+-> `investigating` -> `fix_deployed` (revision/deploy reference) -> `verification`
+(check thật, source mới, đủ debounce) -> `recovered`. Ticket không tự resolved
+chỉ vì deploy xong hoặc logo/login trả200. Active incident/maintenance giữ quyền
+quyết định public status; ticket integration không được thêm writer health thứ hai.
