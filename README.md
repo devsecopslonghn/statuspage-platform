@@ -90,7 +90,10 @@ Admin hiển thị inventory nội bộ, canonical URL, alias/endpoint phụ, lo
 nguồn và lần quan sát, lý do status, public approval và component ID. Không tự
 công bố Ingress/node mới. Policy tại `collector/policy.json` giữ phạm vi host,
 quy tắc include/exclude, override và ID; component metadata tiếp tục thuộc admin.
-Jenkins được người dùng duyệt công bố, kèm URL/logo; GET root hiện403, logo200
-chỉ là tài nguyên tĩnh. Ba node có mapping được duyệt nhưng chưa provision ID.
-Hạn mức gói live chưa biết: công cụ tạo mới chặn cho tới khi operator xác minh.
+Jenkins được người dùng duyệt công bố, kèm URL/logo. Check dùng HTTPS `/login`,
+đúng path readiness/liveness của StatefulSet đã kiểm chứng HTTP 200; root403 do
+anonymous bị chặn, logo200 chỉ là tài nguyên tĩnh. Check không xác nhận job/build.
+Ba node được duyệt công bố riêng. Policy dùng hạn mức tạo mới bảo thủ25, tính cả
+group: mức hỗ trợ của Free/trial và thấp hơn hạn mức paid đã được Atlassian xác
+nhận; không khẳng định account đang dùng Free. Giữ ID đã provision trong Git.
 Xem quy trình và giới hạn trong [runbook](docs/OPERATIONS.md#discovery-url-và-từng-node).

@@ -87,7 +87,8 @@ def validate_url(value):
         return False
 
 def validate_fields(data, kind):
-    allowed = {'page': {'name', 'url'}, 'component': {'name', 'description', 'group_id', 'showcase'}, 'group': {'name'}}[kind]
+    allowed = {'page': {'name', 'url', 'headline', 'page_description'},
+               'component': {'name', 'description', 'group_id', 'showcase'}, 'group': {'name'}}[kind]
     if not isinstance(data, dict) or not data or not set(data) <= allowed:
         raise ValidationError('Thông tin gửi lên có trường không được phép.')
     if 'name' in data and (not isinstance(data['name'], str) or not data['name'].strip()
@@ -98,6 +99,10 @@ def validate_fields(data, kind):
     if 'description' in data and (not isinstance(data['description'], str) or len(data['description']) > 5000
                                   or '\x00' in data['description']):
         raise ValidationError('Mô tả phải là văn bản, tối đa 5000 ký tự.')
+    for field, limit in (('headline', 255), ('page_description', 5000)):
+        if field in data and (not isinstance(data[field], str) or len(data[field]) > limit
+                              or re.search(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', data[field])):
+            raise ValidationError('Tiêu đề/mô tả trang phải là văn bản trong giới hạn cho phép.')
     if 'showcase' in data and type(data['showcase']) is not bool:
         raise ValidationError('Lựa chọn uptime phải là true hoặc false.')
     if 'group_id' in data and data['group_id'] is not None and not isinstance(data['group_id'], str):
@@ -130,7 +135,7 @@ def fetch_overview():
             raise RuntimeError('Configuration page mismatch')
         meta = [{'key': c['key'], 'id': c['id'], 'mode': c.get('mode', 'internal'),
                  'check_count': len(c.get('checks', []))} for c in config['components']]
-    return {'page': {'name': page.get('name'), 'url': page.get('url')}, 'groups': groups,
+    return {'page': {k: page.get(k) for k in ('name', 'url', 'headline', 'page_description')}, 'groups': groups,
             'components': components, 'monitor_config': meta,
             'incidents': [{'name': i.get('name'), 'status': i.get('status'),
                            'shortlink': i.get('shortlink') if validate_url(i.get('shortlink')) else None}

@@ -12,8 +12,8 @@
   "allowed_host_suffixes": [
     "apps.drgdevlab.com"
   ],
-  "component_limit": null,
-  "component_limit_evidence": null,
+  "component_limit": 25,
+  "component_limit_evidence": "2026-10-06: conservative public-page provisioning cap25, counting groups too; not a claim of this account tier. Free/trial25 and paid1100 documented by Atlassian: https://support.atlassian.com/statuspage/docs/what-do-i-get-on-a-free-plan/ ; https://community.atlassian.com/forums/Statuspage-questions/Are-their-limits-on-the-number-of-components-in-the-non-Free/qaq-p/1555695 . Live page12 objects +4 approved additions =16 <=25.",
   "applications": [
     {
       "key": "main-page",
@@ -101,8 +101,9 @@
         200
       ],
       "redirect": "same_host",
-      "url": "https://jenkins.apps.drgdevlab.com/",
-      "logo_url": "https://jenkins.apps.drgdevlab.com/static/10d8c838/images/svgs/logo.svg"
+      "url": "https://jenkins.apps.drgdevlab.com/login",
+      "logo_url": "https://jenkins.apps.drgdevlab.com/static/10d8c838/images/svgs/logo.svg",
+      "assurance": "HTTPS availability of /login, the actual StatefulSet readiness/liveness path (verified 2026-10-06); HTTP200. Root / returns403 because anonymous access is restricted. Does not test authenticated login, agents, jobs or builds."
     },
     {
       "key": "ingress/argocd/argocd-server",

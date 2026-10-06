@@ -36,6 +36,14 @@
                     <label for="page-url">Website URL (phải bắt đầu bằng https://):</label>
                     <input type="url" id="page-url" pattern="https://.*" required maxlength="255">
                 </div>
+                <div class="form-group">
+                    <label for="page-headline">Tiêu đề trên trang công khai:</label>
+                    <input type="text" id="page-headline" maxlength="255">
+                </div>
+                <div class="form-group">
+                    <label for="page-description">Hướng dẫn đọc trạng thái và phạm vi giám sát:</label>
+                    <textarea id="page-description" maxlength="5000"></textarea>
+                </div>
                 <button type="submit" class="btn btn-primary" id="btn-save-page">Lưu cấu hình trang</button>
             </form>
         </section>

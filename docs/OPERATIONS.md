@@ -328,6 +328,41 @@ tính từ thời gian component ở major/partial outage; partial được tín
 0,3. Cột xám là ngày chưa có dữ liệu. Trạng thái hiện tại operational không xóa
 lịch sử outage hoặc làm phần trăm 90 ngày lập tức thành100%.
 
+### Đọc tình trạng cụm trên trang public
+
+API/etcd, Longhorn và ba Kubernetes node có component riêng, không nằm trong
+group thu gọn, để xem trực tiếp trạng thái từng phần mà không mở một hàng
+Platform chung. Tên node giữ hostname và vai trò. Nhóm ứng dụng, SSO/CI và giám
+sát ngoài cụm ghi rõ phạm vi; URL/hostname ứng dụng có trong tên và mô tả.
+Trang chính ưu tiên danh sách trạng thái hiện tại, tắt `showcase` để biểu đồ
+90ngày không chiếm màn hình. Đây chỉ là lựa chọn hiển thị, không xóa component,
+start date hoặc lịch sử đã ghi; admin có thể bật lại lịch sử khi cần.
+
+`Operational` của node nghĩa là Ready=True, không pressure/network-unavailable
+và nguồn/heartbeat còn mới; không khẳng định workload trên node đều healthy.
+API/etcd dùng `/readyz`; Longhorn kiểm tra volume và storage node như phần trên.
+Ứng dụng có URL availability và readiness đã cấu hình. Jenkins dùng HTTPS
+`/login`, là path readiness/liveness thực tế của StatefulSet đã đọc từ cluster;
+HTTP200 không chứng minh login có xác thực, agents hoặc job/build. Root403 được
+ghi rõ là anonymous bị hạn chế, không dùng logo làm health.
+
+Nội bộ thu thập khoảng60giây, báo lỗi sau3mẫu mới và phục hồi sau2mẫu mới;
+collector quá180giây hoặc Ready heartbeat quá600giây không được xanh giả.
+Giám sát từ GitHub chạy khoảng30phút và có thể trễ; không gọi nó là kiểm tra
+liên tục. Tên/mô tả/nhóm/headline tiếp tục thuộc admin và sync không ghi đè.
+Admin cho sửa `headline`/`page_description` qua cùng SSO, CSRF và audit; không
+mở custom HTML, status write hoặc API proxy. API không công bố setting mặc định
+expand group/reorder, nên không dựa vào trường API chưa được hỗ trợ để ẩn/hiện
+dữ liệu cụm.
+
+Policy đặt `component_limit=25` là trần tạo mới bảo thủ, không phải tên gói:
+[Free public25](https://support.atlassian.com/statuspage/docs/what-do-i-get-on-a-free-plan/),
+[Atlassian xác nhận trial25/paid1100](https://community.atlassian.com/forums/Statuspage-questions/Are-their-limits-on-the-number-of-components-in-the-non-Free/qaq-p/1555695).
+Đếm cả group nên12object hiện hữu +4component được duyệt =16 vẫn nằm trong trần.
+GET page không có field billing/tier; chưa xác minh tên gói thực tế. Không nâng
+trần lên1100 khi chưa có bằng chứng account-specific. Mọi tạo mới vẫn là operator
+preview/apply, không tự tạo từ collector hoặc sync.
+
 ### Giao diện cho bước ticket tiếp theo
 
 Chưa kết nối ticket service. Nguồn đề xuất là transition **sau debounce và sau

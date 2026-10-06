@@ -361,3 +361,25 @@ outbox delivery.
 - Chỉ thay đổi tài liệu trong Git; `git diff --check` PASS. Không thay code/config
   deployment nên không chạy lại test suite hoặc rollout; main push đã được user
   cho phép. Jenkins và ba node vẫn pending mapping/capacity như ghi nhận trước đó.
+
+### Làm rõ trạng thái cụm trên public page — 2026-10-06
+
+- User yêu cầu nhìn trang là nắm được tình trạng cụm. Chuẩn bị layout native:
+  API/etcd, Longhorn và ba node hiện riêng không thu gọn; ứng dụng, SSO/CI và
+  giám sát ngoài cụm có tên/phạm vi rõ. Tắt showcase ở trang chính để đọc status
+  hiện tại, giữ component ID/start date/history; không đặt xanh bằng tay.
+- StatefulSet Jenkins live có readiness/liveness HTTP GET `/login` port8080.
+  HTTPS public `/login` trả200 với TLS và redirect denied; root `/` vẫn403.
+  Policy đổi URL check sang endpoint thực tế này và ghi rõ không kiểm chứng
+  authenticated login/agents/jobs/builds. Không chấp nhận403 như200 và không dùng
+  logo health. Các app/backend và node health rule còn lại giữ nguyên.
+- Capacity dùng trần bảo thủ25 tính cả group, có bằng chứng Free/trial25 và paid
+  1100 từ Atlassian. Không suy account là Free hoặc nâng trần1100.12object hiện
+  hữu +4approved additions =16; gỡ blocker do chưa có tier cụ thể bằng trần chung
+  đã có bằng chứng. Component creation vẫn qua preview/provisioner có durable ID.
+- Admin bổ sung headline/page_description vào allowlist và form với validation,
+  giữ OAuth group/CSRF/audit/sanitized output; không thêm status write, custom HTML
+  hoặc arbitrary API fields. Bổ sung kiểm tra route thực tế cho validation, CSRF,
+  upstream payload và sanitized overview.
+- Đây là patch chuẩn bị triển khai và provision; chưa ghi nhận node/Jenkins đã
+  public trong đoạn này. Bằng chứng local và live hoàn thành sẽ bổ sung dưới đây.

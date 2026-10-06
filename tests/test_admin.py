@@ -95,6 +95,37 @@ class AdminHTTPTests(unittest.TestCase):
         rows=json.loads(self.request('GET','/api/audit')[2]);self.assertEqual(rows[0]['result'],'SUCCESS')
         self.assertEqual(rows[0]['user'],'operator|admin@example.com')
 
+    def test_public_page_context_keeps_csrf_and_field_boundaries(self):
+        content = {'headline': 'Trạng thái cụm Kubernetes',
+                   'page_description': 'Node Ready và pressure.\nKhông kiểm chứng job/build.'}
+        self.assertEqual(self.request('PATCH','/api/pages/'+server.PAGE_ID,content,
+                                      {**self.headers,'X-CSRF-Token':'bad'})[0],403)
+        self.api._request.assert_not_called()
+        self.assertEqual(self.request('PATCH','/api/pages/'+server.PAGE_ID,content)[0],200)
+        self.api._request.assert_any_call('PATCH','/',data={'page':content},is_mutation=True)
+        writes = sum(c.args[0] == 'PATCH' for c in self.api._request.call_args_list)
+        for bad in ({'headline': False}, {'headline': 'x'*256}, {'page_description': []},
+                    {'page_description': 'x'*5001}, {'page_description': 'bad\x00'},
+                    {'headline': 'x', 'custom_html': '<script>'}, {'status': 'operational'}):
+            with self.subTest(data=str(bad)[:50]):
+                self.assertEqual(self.request('PATCH','/api/pages/'+server.PAGE_ID,bad)[0],400)
+        self.assertEqual(sum(c.args[0] == 'PATCH' for c in self.api._request.call_args_list),writes)
+
+    def test_public_context_is_sanitized_and_not_allowed_on_components(self):
+        original = self.upstream
+        def context(method,path,**kw):
+            result = original(method,path,**kw)
+            if method == 'GET' and path == '/':
+                result.update(headline='Cụm',page_description='Phạm vi kiểm tra')
+            return result
+        self.api._request.side_effect = context
+        code,_,body = self.request('GET','/api/overview')
+        self.assertEqual(code,200)
+        self.assertEqual(json.loads(body)['page']['headline'],'Cụm')
+        self.assertEqual(json.loads(body)['page']['page_description'],'Phạm vi kiểm tra')
+        self.assertNotIn(b'SECRET',body)
+        self.assertEqual(self.request('PATCH','/api/components/c1',{'headline':'X'})[0],400)
+
     def test_sanitized_overview_and_cache(self):
         code,headers,body=self.request('GET','/api/overview');self.assertEqual(code,200)
         self.assertNotIn(b'SECRET',body);self.assertNotIn(b'javascript:',body)

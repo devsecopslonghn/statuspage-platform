@@ -110,6 +110,8 @@ async function loadData() {
         // Update Page Form
         document.getElementById('page-name').value = data.page.name || '';
         document.getElementById('page-url').value = data.page.url || '';
+        document.getElementById('page-headline').value = data.page.headline || '';
+        document.getElementById('page-description').value = data.page.page_description || '';
         
         // Update Incidents
         const incList = document.getElementById('incidents-list');
@@ -258,7 +260,9 @@ document.getElementById('page-form').addEventListener('submit', async (e) => {
     try {
         const body = {
             name: document.getElementById('page-name').value,
-            url: document.getElementById('page-url').value
+            url: document.getElementById('page-url').value,
+            headline: document.getElementById('page-headline').value,
+            page_description: document.getElementById('page-description').value
         };
         await apiCall('/pages/hsyg2r4ql1pr', 'PATCH', body);
         showToast('Đã lưu cấu hình trang');
