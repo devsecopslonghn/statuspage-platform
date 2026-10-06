@@ -304,3 +304,31 @@ outbox delivery.
 - Local suite67tests PASS; render production/staging và `git diff --check` PASS.
   Bản sửa chưa merge/deploy; cần rollout có phép và ít nhất2fresh observation để
   xác minh sync tự phục hồi public status. Không sửa Secret hoặc component IDs.
+
+
+### Xác minh main và public phục hồi sau hotfix
+
+- User cho phép push trực tiếp main để Argo triển khai. Khi bắt đầu thực hiện,
+  remote main đã có PR7 squash commit `3c9b320de559bbfb2a94ef6772134e72839eafbc`
+  chứa đúng hotfix; không tạo bản sao thay đổi. Local main fast-forward theo remote.
+- Argo đã chạy đúng revision3c9b320, operation Succeeded; collector/sync rollout
+  thành công, admin/collector/sync đều Deployment Ready1/1, admin pod2/2.
+- Collector có các snapshot nguồn mới riêng tại1791279508.773623,
+  1791279568.7751386 và1791279628.775453. Website/CR7/Card Credit/Fund/Auth đều
+  URL HTTP200. Backend/OIDC checks true trong sync. Sau đủ fresh recovery samples,
+  sync tự PATCH các component về operational; không sửa status bằng tay.
+- Public GET summary lúc1791279717.8073497 trả indicator none,
+  `All Systems Operational`, không có component/group non-operational và không
+  incident. Heartbeat HTTP200, ok=true, last_success_at1791279711.6251504.
+  Đây là trạng thái của tập component đang được monitor, không kiểm chứng mọi
+  workload/nghiệp vụ trong cluster.
+- Admin URL chuyển tới Keycloak login hoạt động; public `/observations` trả404,
+  telemetry nội bộ không bị expose. Không chạy browser login/save E2E.
+- Argo health Healthy; tổng sync vẫn OutOfSync chỉ bởi6ConfigMap hash cũ
+  requiresPruning=true, tất cả resource mong muốn đã Synced. Không prune/xóa
+  ConfigMap hoặc đổi chính sách prune:false trong lượt này.
+- Jenkins403 tiếp tục là failed URL availability trong inventory; Jenkins và
+  ba node vẫn pending component mapping vì chưa xác minh capacity/provision ID.
+  Không ghi nhận bốn component mới đã public. Không đổi Secret, ID, incident,
+  ticket hoặc gửi thông báo. Bằng chứng xác minh được push vào main riêng bằng
+  commit tài liệu sau rollout; code runtime không thay đổi.
