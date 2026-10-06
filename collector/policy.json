@@ -96,7 +96,7 @@
         "jenkins/jenkins"
       ],
       "publish": true,
-      "component_id": null,
+      "component_id": "pjr33khwjywd",
       "expected_status": [
         200
       ],
@@ -256,19 +256,19 @@
       "key": "node/k8s-master",
       "name": "k8s-master",
       "publish": true,
-      "component_id": null
+      "component_id": "104nsn9ydg7c"
     },
     {
       "key": "node/k8s-worker1",
       "name": "k8s-worker1",
       "publish": true,
-      "component_id": null
+      "component_id": "dl09rwq6pr98"
     },
     {
       "key": "node/k8s-worker2",
       "name": "k8s-worker2",
       "publish": true,
-      "component_id": null
+      "component_id": "1f3xssf9b10f"
     }
   ],
   "allowed_private_addresses": {

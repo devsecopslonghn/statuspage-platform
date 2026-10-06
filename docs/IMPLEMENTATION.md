@@ -383,3 +383,18 @@ outbox delivery.
   upstream payload và sanitized overview.
 - Đây là patch chuẩn bị triển khai và provision; chưa ghi nhận node/Jenkins đã
   public trong đoạn này. Bằng chứng local và live hoàn thành sẽ bổ sung dưới đây.
+
+#### Provision và registry cố định
+
+- Patch9e90e2b qua69tests, JavaScript syntax, production/staging render và diff
+  check PASS rồi push main theo quyền user đã cho. Collector sau rollout đọc
+  policy cap25 và kiểm tra Jenkins `/login` HTTP200; ba node Ready/no pressure.
+- Operator preview thấy12object hiện hữu,4create,16<=25. Chạy lại preview trên
+  snapshot mới, đối chiếu đúng action list trước apply. Provisioner tạo4component
+  initial degraded, không retry POST; lưu registry vào audit PVC tại
+  `/data/operator-public-policy-registry.json` sau mỗi ID. Không xóa/recreate
+  component cũ, thay Secret, tạo incident/ticket hoặc gửi notification.
+- IDs mới: Jenkins `pjr33khwjywd`; master `104nsn9ydg7c`; worker1 `dl09rwq6pr98`;
+  worker2 `1f3xssf9b10f`. Merge đúng4mapping vào policy Git;5mapping ứng dụng cũ
+  giữ nguyên. Public health sẽ do sync xác nhận sau rollout mapping, không PATCH
+  xanh thủ công. Policy validation và production/staging render PASS.
