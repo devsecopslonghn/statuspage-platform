@@ -97,3 +97,10 @@ Ba node được duyệt công bố riêng. Policy dùng hạn mức tạo mới
 group: mức hỗ trợ của Free/trial và thấp hơn hạn mức paid đã được Atlassian xác
 nhận; không khẳng định account đang dùng Free. Giữ ID đã provision trong Git.
 Xem quy trình và giới hạn trong [runbook](docs/OPERATIONS.md#discovery-url-và-từng-node).
+
+Trang public có 13 component/3 group. Ba node, API/etcd và Longhorn hiện riêng
+ngay trong màn hình đầu; nhóm ứng dụng, SSO/CI và giám sát ngoài cụm mở khi cần.
+Trang chính tắt showcase để ưu tiên status hiện tại; không xóa lịch sử đã ghi.
+URL và loại check nằm trong mô tả; hai metric ghi rõ là lịch sử, không phải kết
+luận sức khỏe hiện tại của toàn bộ cụm. Admin có thể sửa headline/page description
+và bật lại showcase; sync không ghi đè các lựa chọn này.

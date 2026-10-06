@@ -410,3 +410,45 @@ outbox delivery.
   Audit ghi SUCCESS. Đây là thao tác metadata đã được user yêu cầu, không phải
   thử outage. UI inventory đổi chữ thành "Trần công bố cấu hình (tính cả group)"
   để không nhầm cap25 là gói billing thực tế.
+
+#### Nghiệm thu public layout, mapping và health
+
+- Public có 13 component/3 group. Ba node, API/etcd và Longhorn không nằm trong
+  group, `only_show_if_degraded=false`, showcase=false. Các component khác cũng
+  tắt showcase để trang chính ưu tiên tình trạng hiện tại. 9 ID component cũ,
+  3 ID group và 2 ID metric giữ nguyên; không gửi thay đổi start date/history.
+- Native page headline cuối là `DRG DevLab — Cụm Kubernetes`, page description
+  để trống. Kiểm tra trình duyệt cho thấy khối About và tên dài che các dòng
+  quan trọng; bản cuối rút gọn tên: Node k8s-master/worker1/worker2, API server &
+  etcd, Longhorn storage; vai trò/check detail trong tooltip. Group: Ứng dụng,
+  SSO & CI/CD, Ngoài cụm: ~30 phút. App/SSO/Jenkins có hostname/URL và phạm vi
+  kiểm tra; Jenkins ghi rõ service root403 và probe `/login`200.
+- Hai metric chỉ đổi name/tooltip_description, giữ ID/data, tên có tiền tố
+  Lịch sử; tooltip giải thích số tóm tắt theo cửa sổ thời gian không phải trạng
+  thái tức thời hoặc uptime SLA. Metadata được operator review và audit, không
+  thêm bất kỳ metadata writer tự động nào vào sync.
+- Browser smoke chỉ đọc trang public (không login/save SSO E2E): desktop 1280x900
+  và mobile 390x844 PASS. Cả 5 dòng cụm và 3 group nằm trong viewport đầu, không cần
+  click, tên đủ không ellipsis, không horizontal overflow. Mở 3 group thấy đủ 13
+  component. Ảnh local: `/tmp/statuspage-cluster-desktop.png`,
+  `/tmp/statuspage-cluster-mobile.png`. Không commit ảnh/browser dependencies.
+- Public JSON đối chiếu name/description/group/showcase đúng payload review;
+  latest audit cho 19 target page/component/group/metric đều SUCCESS. Lỗi 404 ban
+  đầu vẫn giữ trong audit và đã được sửa; không xóa audit để giấu lỗi.
+- Telemetry tại 1791282402.51: cả 11 component writer nội bộ có raw/final/public
+  operational, backend/OIDC/API/Longhorn checks true, không manual precedence
+  hoặc write error. Sync tự ghi xanh sau đủ mẫu mới; không PATCH status bằng tay.
+  Public All Systems Operational, không incident, không component/group lỗi.
+  Heartbeat HTTP 200, ok=true, last_success_at1791282405.5654447.
+- Inventory mới 1791282539.065315: 21 row, 9 public mapping, 12 internal, 0 pending.
+  Cluster có 18 Ingress/24 route; main website là external override, Fund hai
+  Ingress chung một app. Wildcard fallback unsafe và 2 endpoint Statuspage bị loại
+  probe, giữ lý do trong inventory. Những endpoint quản trị chưa duyệt vẫn nội
+  bộ. Ba Node conditions Ready=True, pressure=False, heartbeat mới đối chiếu
+  Kubernetes API; không suy mọi workload trong cluster đều healthy.
+- Runtime GitOps revision bb99b02 Healthy, operation Succeeded; resource desired
+  đều Synced. Tổng OutOfSync chỉ do 10 ConfigMap hash cũ pending prune; không prune
+  hoặc đổi policy root. Cả 3 Deployment Ready. CI render của các commit trước PASS;
+  full 69 tests và 16 admin regression tests PASS, JavaScript syntax, production/
+  staging render và diff check PASS. Không thay Secret/Prometheus, incident,
+  ticket, subscriber hoặc gửi thông báo. Root repository không thay đổi.

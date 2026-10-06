@@ -332,8 +332,8 @@ lịch sử outage hoặc làm phần trăm 90 ngày lập tức thành100%.
 
 API/etcd, Longhorn và ba Kubernetes node có component riêng, không nằm trong
 group thu gọn, để xem trực tiếp trạng thái từng phần mà không mở một hàng
-Platform chung. Tên node giữ hostname và vai trò. Nhóm ứng dụng, SSO/CI và giám
-sát ngoài cụm ghi rõ phạm vi; URL/hostname ứng dụng có trong tên và mô tả.
+Platform chung. Tên node giữ hostname, vai trò nằm trong mô tả. Nhóm ứng dụng,
+SSO/CI và giám sát ngoài cụm ghi rõ phạm vi; URL/hostname ứng dụng có trong tên và mô tả.
 Trang chính ưu tiên danh sách trạng thái hiện tại, tắt `showcase` để biểu đồ
 90ngày không chiếm màn hình. Đây chỉ là lựa chọn hiển thị, không xóa component,
 start date hoặc lịch sử đã ghi; admin có thể bật lại lịch sử khi cần.
@@ -354,6 +354,20 @@ Admin cho sửa `headline`/`page_description` qua cùng SSO, CSRF và audit; kh�
 mở custom HTML, status write hoặc API proxy. API không công bố setting mặc định
 expand group/reorder, nên không dựa vào trường API chưa được hỗ trợ để ẩn/hiện
 dữ liệu cụm.
+
+Headline hiện là `DRG DevLab — Cụm Kubernetes`; page description để trống để
+khối About không đẩy trạng thái xuống dưới màn hình đầu. Rule nằm ở tooltip
+component. Các dòng luôn hiện là `Node k8s-master`, `Node k8s-worker1`,
+`Node k8s-worker2`, `API server & etcd`, `Longhorn storage`. Tên ngắn để hiển thị
+đầy đủ trên điện thoại. Ba group giữ ID cũ, tên `Ứng dụng`, `SSO & CI/CD`,
+`Ngoài cụm: ~30 phút`; lần lượt chứa 4 app, Auth/Jenkins và 2 watchdog component.
+Hai metric giữ ID/data, tên có tiền tố `Lịch sử:`; giá trị tóm tắt cửa sổ ngày/
+tuần/tháng không phải health hiện tại. Không tự đồng bộ lại metadata theo seed.
+
+Khi tách component khỏi group, admin gửi JSON `group_id:null`. Live API trả 404
+với chuỗi `"null"` dù phần mô tả tài liệu dùng chữ "null"; đã kiểm chứng JSON
+null giữ đúng các metadata còn lại và tách component thành công. Không gửi
+`start_date`, status hoặc metric samples trong thao tác thay bố cục.
 
 Policy đặt `component_limit=25` là trần tạo mới bảo thủ, không phải tên gói:
 [Free public25](https://support.atlassian.com/statuspage/docs/what-do-i-get-on-a-free-plan/),
