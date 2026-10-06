@@ -33,6 +33,11 @@ flowchart LR
 | Định nghĩa check, ID component, deployment | Git | Pull request và Argo CD |
 | Incident/maintenance, subscriber và notification | Atlassian | Link trực tiếp từ web quản trị |
 
+Kubernetes Control Plane kiểm tra trực tiếp API `/readyz` với TLS CA của cluster;
+Persistent Storage đọc health của volume và storage node từ Longhorn API.
+Hai check này không phụ thuộc Prometheus. Check control plane không đo readiness
+của từng worker; xem [runbook](docs/OPERATIONS.md) để biết phạm vi kiểm tra.
+
 `showcase` điều khiển lịch sử uptime của component; không ẩn component khỏi public
 page. Web nội bộ không tự ý xóa component đang được monitor, sửa check URL hoặc
 thay trạng thái sức khỏe. Các thay đổi giao diện không bị sync ghi đè.

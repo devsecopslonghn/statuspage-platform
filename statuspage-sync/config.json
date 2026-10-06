@@ -143,32 +143,16 @@
       "group": "Platform",
       "checks": [
         {
-          "type": "prometheus",
-          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
-          "query": "up{job=\"kube-apiserver\"} and (time() - timestamp(up{job=\"kube-apiserver\"}) < 90)",
-          "comparison": "eq",
-          "threshold": 1,
-          "max_age_seconds": 90
-        },
-        {
-          "type": "prometheus",
-          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
-          "query": "kube_node_status_condition{condition=\"Ready\",status=\"true\"} and (time() - timestamp(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) < 90)",
-          "comparison": "eq",
-          "threshold": 1,
-          "max_age_seconds": 90
-        },
-        {
-          "type": "prometheus",
-          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
-          "query": "count(kube_node_status_condition{condition=\"Ready\",status=\"true\"} and (time() - timestamp(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) < 90))",
-          "comparison": "gte",
-          "threshold": 3,
-          "max_age_seconds": 90
+          "type": "http",
+          "url": "https://kubernetes.default.svc.cluster.local/readyz",
+          "expected_status": [
+            200
+          ],
+          "ca_file": "/trust/ca.crt"
         }
       ],
       "failure_status": "degraded_performance",
-      "description": "Cluster API reachability and node readiness."
+      "description": "Kubernetes control plane readiness, including its etcd readiness check; does not measure individual worker node readiness."
     },
     {
       "key": "storage",
@@ -178,32 +162,32 @@
       "group": "Platform",
       "checks": [
         {
-          "type": "prometheus",
-          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
-          "query": "up{job=\"longhorn\"} and (time() - timestamp(up{job=\"longhorn\"}) < 90)",
-          "comparison": "eq",
-          "threshold": 1,
-          "max_age_seconds": 90
+          "type": "http",
+          "url": "http://longhorn-backend.longhorn-system.svc.cluster.local:9500/v1/volumes",
+          "expected_status": [
+            200
+          ],
+          "body_json_items": "data",
+          "body_json_item_values": {
+            "robustness": "healthy"
+          },
+          "min_items": 1
         },
         {
-          "type": "prometheus",
-          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
-          "query": "longhorn_volume_robustness{state=\"healthy\"} and (time() - timestamp(longhorn_volume_robustness{state=\"healthy\"}) < 90)",
-          "comparison": "eq",
-          "threshold": 1,
-          "max_age_seconds": 90
-        },
-        {
-          "type": "prometheus",
-          "url": "http://prometheus.monitoring.svc.cluster.local:9090",
-          "query": "longhorn_volume_robustness{state=~\"degraded|faulted|unknown\"} and (time() - timestamp(longhorn_volume_robustness{state=~\"degraded|faulted|unknown\"}) < 90)",
-          "comparison": "eq",
-          "threshold": 0,
-          "max_age_seconds": 90
+          "type": "http",
+          "url": "http://longhorn-backend.longhorn-system.svc.cluster.local:9500/v1/nodes",
+          "expected_status": [
+            200
+          ],
+          "body_json_items": "data",
+          "body_json_item_values": {
+            "conditions.Ready.status": "True"
+          },
+          "min_items": 2
         }
       ],
       "failure_status": "degraded_performance",
-      "description": "Storage service monitoring and volume health."
+      "description": "Live Longhorn API checks: every returned volume healthy and at least two storage nodes ready. Empty or unavailable responses fail."
     },
     {
       "key": "internet",

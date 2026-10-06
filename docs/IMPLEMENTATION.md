@@ -107,3 +107,45 @@ bằng file tools (exit0, JSON SUCCESS, stderr trống). Coordinator review actu
 | Ghi nhận giới hạn xác minh | Full browser login/save chưa chạy lại sau chỉ dẫn không chạy tests; không ghi nhận E2E là PASS |
 
 Các lượt triển khai/rà soát và xử lý nhận xét chi tiết ở [REVIEW.md](REVIEW.md).
+
+## Khôi phục Statuspage sau khi gỡ monitoring — 2026-10-06
+
+- Người dùng xác nhận namespace `monitoring` đã chủ đích gỡ và yêu cầu đổi nguồn
+  kiểm tra. Không khôi phục Prometheus hoặc thay đổi repo cluster root.
+- Read-only live: sync Running nhưng0/1, log liên tục `Statuspage HTTPError 401`;
+  GET bằng Kubernetes API key và file key cũ đều401. GitHub secret được cập nhật
+  02:39UTC và watchdog chạy lại thành công; giá trị đó không đọc lại được từ GitHub.
+- Ba Kubernetes node Ready;7volume Longhorn attached/healthy,2storage node Ready.
+  Public Statuspage có cluster/storage/monitoring degraded, không có active incident.
+- Bản sửa local: control plane GET `/readyz` với cluster CA và không có token;
+  storage GET Longhorn volumes/nodes với kiểm tra mọi phần tử, yêu cầu dữ liệu
+  không rỗng và ít nhất2storage node. Mount CA và mở egress API server/Longhorn.
+  Giữ debounce, incident precedence và writer ownership.
+- Kiểm chứng read-only bằng code mới: API readiness200 và TLS hợp lệ qua endpoint
+  quản trị; Longhorn volumes/nodes PASS qua Kubernetes service proxy. Port-forward
+  service không dùng được vì manager không bind loopback9500; đã dừng session và
+  dùng proxy tạm trên localhost, cũng đã dừng sau xác minh.
+- Python syntax/config validation, render production/staging và `git diff --check`
+  đạt. Không chạy unit/browser tests theo AGENTS.md của repo.
+- Chưa deploy/push/đổi Secret. Cần file key mới hợp lệ và quyền cập nhật production.
+  NetworkPolicy hiện tại chặn request từ pod tới API server và Longhorn; luồng mới
+  phải được xác minh lại sau khi deploy. Chưa ghi nhận public page phục hồi.
+
+### Theo dõi sau khi operator cập nhật Secret
+
+- Operator đã patch `statuspage/statuspage-api-key` từ file key mới. GET incident
+  và component bằng Secret mới đạt200; ban đầu key mount trong pod còn401 trong
+  lúc chờ Secret volume cập nhật, sau đó sync tự phục hồi, không restart.
+- Hai vòng sync liên tiếp thành công: heartbeat public200, `ok=true`,
+  `last_success_at` tăng từ1791275261.720834 lên1791275321.2942975; pod sync1/1.
+  Log vòng tiếp theo không còn401, các application component Operational.
+- Cluster/storage vẫn degraded vì cấu hình live còn dùng Prometheus đã gỡ.
+  Status Monitoring trên public page vẫn degraded, chờ watchdog quan sát heartbeat
+  mới. Bản sửa direct API vẫn local, chưa có quyền deploy/push và chưa áp dụng.
+
+### Triển khai patch direct API
+
+- Người dùng đã cho phép triển khai patch qua GitOps. Worktree chỉ có bảy file
+  của bản sửa này; `main` khớp `origin/main` trước triển khai.
+- Render production và server-side dry-run đạt cho toàn bộ manifests, bao gồm
+  CA mount và Cilium egress mới. Không chạy unit/browser tests theo AGENTS.md.

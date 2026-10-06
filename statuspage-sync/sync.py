@@ -7,6 +7,7 @@ import math
 import os
 import re
 import signal
+import ssl
 import sys
 import threading
 import time
@@ -60,9 +61,18 @@ def check_http(check: dict) -> Tuple[bool, Optional[float]]:
     req = urllib.request.Request(url, headers={'User-Agent': 'DRGDevLab-StatusMonitor/1.0'})
     start = time.time()
     try:
-        with opener.open(req, timeout=10) as resp:
+        check_opener = opener
+        if check.get('ca_file'):
+            context = ssl.create_default_context(cafile=check['ca_file'])
+            check_opener = urllib.request.build_opener(
+                StrictHttpsRedirectHandler(), urllib.request.HTTPSHandler(context=context))
+        with check_opener.open(req, timeout=10) as resp:
             status = resp.status
-            body = resp.read(65536)
+            collection = bool(check.get('body_json_items'))
+            limit = 2 * 1024 * 1024 if collection else 65536
+            body = resp.read(limit + 1 if collection else limit)
+            if collection and len(body) > limit:
+                return False, None
     except urllib.error.HTTPError as e:
         status = e.code
         try:
@@ -95,6 +105,20 @@ def check_http(check: dict) -> Tuple[bool, Optional[float]]:
             if val is None or ('body_json_value' in check and val != json_val):
                 return False, None
         except Exception:
+            return False, None
+
+    if check.get('body_json_items'):
+        try:
+            items = extract_json_path(json.loads(body_str), check['body_json_items'])
+            if not isinstance(items, list) or len(items) < check.get('min_items', 1):
+                return False, None
+            for item in items:
+                if not isinstance(item, dict):
+                    return False, None
+                for path, expected in check['body_json_item_values'].items():
+                    if extract_json_path(item, path) != expected:
+                        return False, None
+        except (ValueError, KeyError, TypeError):
             return False, None
 
     return True, lat
@@ -478,6 +502,18 @@ def validate_config(config):
                 statuses = check.get('expected_status', [200])
                 if not statuses or any(not isinstance(s, int) or s < 200 or s > 599 for s in statuses):
                     raise ValueError('Invalid expected HTTP status')
+                if check.get('ca_file') and (mode != 'internal' or parsed.scheme != 'https'
+                                             or check['ca_file'] != '/trust/ca.crt'):
+                    raise ValueError('Invalid HTTP CA file')
+                if 'body_json_items' in check:
+                    values = check.get('body_json_item_values')
+                    minimum = check.get('min_items', 1)
+                    if (not isinstance(check['body_json_items'], str) or not check['body_json_items']
+                            or not isinstance(values, dict) or not values
+                            or any(not isinstance(path, str) or not path or value is None
+                                   for path, value in values.items())
+                            or type(minimum) is not int or minimum < 1):
+                        raise ValueError('Invalid HTTP JSON collection check')
             else:
                 if mode != 'internal' or check.get('comparison') not in ('eq', 'gte', 'lte') or not check.get('query'):
                     raise ValueError('Invalid Prometheus check')

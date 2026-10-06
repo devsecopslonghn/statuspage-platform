@@ -76,6 +76,43 @@ có thể bị GitHub trì hoãn; theo dõi run history và Actions quota. Nó k
 Lỗi API/monitoring không được xem là healthy. Khi cụm down, public page vẫn ở
 Atlassian, nhưng reading nội bộ có thể stale. Quản trị Atlassian vẫn dùng được.
 
+### Kiểm tra platform khi không còn Prometheus
+
+Sync kiểm tra control plane bằng HTTPS GET
+`https://kubernetes.default.svc.cluster.local/readyz`, xác minh chứng chỉ bằng
+ConfigMap `kube-root-ca.crt` mount tại `/trust/ca.crt`. Request không dùng token;
+không cấp ServiceAccount token hoặc RBAC cho workload. Check này chỉ xác nhận
+readiness của API server (bao gồm etcd), không còn đo readiness của từng worker.
+Cilium policy `statuspage-sync-apiserver-egress` cho phép đúng API server.
+
+Storage dùng GET `/v1/volumes` và `/v1/nodes` tại
+`longhorn-backend.longhorn-system.svc.cluster.local:9500`. Mọi volume trả về phải
+có `robustness=healthy`; phải có ít nhất hai storage node và mọi node trả về có
+`conditions.Ready.status=True`. Response rỗng, lỗi, thiếu trường hoặc vượt 2MiB
+đều thất bại. NetworkPolicy chỉ mở port9500 tới namespace `longhorn-system`.
+Không dùng metric lịch sử, không cần khôi phục namespace `monitoring`.
+
+HTTP check hỗ trợ `body_json_items` (đường dẫn collection),
+`body_json_item_values` (các trường phải khớp trên mọi phần tử) và `min_items`
+(mặc định1, tối thiểu1). `ca_file` chỉ cho phép `/trust/ca.crt` với HTTPS internal.
+Debounce và ưu tiên incident/maintenance giữ nguyên.
+
+### Khôi phục khi API key bị từ chối
+
+Nếu log có `Statuspage HTTPError 401`, kiểm tra key mới bằng Manage API GET
+trên page `hsyg2r4ql1pr` trước khi thay key. Không in key hoặc response quản trị.
+Key cần quyền đọc incident/maintenance/component và ghi component/metric.
+Cập nhật cả Kubernetes Secret `statuspage/statuspage-api-key` và GitHub secret
+`STATUSPAGE_API_KEY` theo lệnh bootstrap ở trên; đổi một nơi không đổi nơi kia.
+GitHub không cho đọc lại giá trị secret, cần file key hợp lệ từ operator.
+
+Sync đọc lại key trên từng request; Secret volume tự cập nhật nên không cần
+restart chỉ để rotate key. Admin dùng cùng Kubernetes Secret. Chờ một vòng sync,
+kiểm tra pod Ready và heartbeat HTTP200. Sau hai quan sát thành công liên tiếp,
+component nội bộ được phục hồi; watchdog ngoài cụm cập nhật Status Monitoring ở
+lần chạy tiếp theo. Khi cần phục hồi ngay, operator chạy watchdog thủ công sau
+khi heartbeat đạt200. Chỉ ghi Operational dựa trên check thật.
+
 ## Audit, lưu trữ và backup
 
 Audit SQLite nằm trong PVC `statuspage-admin-data` 1Gi, StorageClass

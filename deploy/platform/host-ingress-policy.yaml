@@ -24,3 +24,17 @@ spec:
     - fromEntities: [host, remote-node, kube-apiserver]
       toPorts:
         - ports: [{port: "8080", protocol: TCP}]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: statuspage-sync-apiserver-egress
+spec:
+  endpointSelector:
+    matchLabels: {app: statuspage-sync}
+  egress:
+    - toEntities: [kube-apiserver]
+      toPorts:
+        - ports:
+            - {port: "443", protocol: TCP}
+            - {port: "6443", protocol: TCP}
