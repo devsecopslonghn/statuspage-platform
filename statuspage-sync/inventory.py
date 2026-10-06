@@ -366,7 +366,9 @@ def collect_inventory(ingresses, nodes, policy, previous=None, now=None, probe=b
                 row['source_observed_at'] = now
         if rule.get('retired'):
             row['observation'] = {'status': 'degraded_performance', 'reason': 'retired: ' + rule['retirement_reason'], 'observed_at': now}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    # Eight fresh Python/TLS workers exhaust the collector's 250m CPU quota and
+    # can exhaust the probe deadline. Bound concurrency without extending deadlines.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         futures = {executor.submit(probe, r['url'], grouped[r['key']]['rule'], policy): r
                    for r in rows.values() if r.get('probe_allowed')}
         for future in concurrent.futures.as_completed(futures):

@@ -210,6 +210,10 @@ về `100.125.138.71`: chỉ cặp `auth.apps.drgdevlab.com`/IP này được ng
 trong policy, Cilium cho host/node TCP443 để tới ingress. Không cho loopback,
 link-local hoặc IP private bất kỳ. Chuyển ingress cần cập nhật ngoại lệ đúng IP.
 
+Collector chạy tối đa2probe subprocess đồng thời với CPU limit250m. Không tăng
+concurrency nếu chưa đo lại startup Python/TLS dưới CPU quota:8worker đã gây
+throttle và timeout giả trong probe budget. Deadline tính cả startup worker.
+
 Mỗi probe là HTTPS GET URL thật, default HTTP200, check TLS, deadline10giây;
 worker subprocess bị kill khi hết hạn (cả DNS/TLS/headers). Check availability
 chỉ xét response status, không chứng minh backend/nghiệp vụ. Redirect tới login
