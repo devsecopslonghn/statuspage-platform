@@ -305,6 +305,29 @@ không hứa clickable directory hoặc icon trên public page. Custom HTML trê
 `*.statuspage.io` không được hiển thị theo [Atlassian docs](https://support.atlassian.com/statuspage/docs/use-custom-html-on-a-status-page/);
 nếu cần click-to-open/icon public cần quyết định UI/domain riêng sau task này.
 
+### URL public và rule hiển thị mặc định
+
+Các component hiện hữu có URL public được bổ sung vào `description`, hiển thị ở
+tooltip `?`: Website, CR7 All Goals, Card Credit, Fund Management, Authentication
+(URL OIDC discovery), External Service Access (ba URL được kiểm tra) và Status
+Monitoring (heartbeat). Đây là metadata do admin quản lý; seed description trong
+config không phải desired state và sync không ghi đè mô tả. Khi cập nhật, đọc mô
+tả hiện tại, chỉ thêm URL đã duyệt, giữ nguyên nội dung cũ và ghi audit. Không đưa
+URL readiness nội bộ của Kubernetes/Longhorn hoặc backend vào trang public.
+
+Statuspage [tự tổng hợp trạng thái chung](https://support.atlassian.com/statuspage/docs/top-level-status-and-incident-impact-calculations/)
+từ status component. Với nhiều component: tất cả operational → All Systems
+Operational; có major_outage trong khi các component khác operational → Partial
+System Outage; có partial_outage trong khi các component khác operational → Minor
+Service Outage. Statuspage [không tự ping URL](https://support.atlassian.com/statuspage/docs/know-when-to-automate-your-status-page/).
+HTTP 200, TLS, redirect, readiness và debounce 3 mẫu lỗi/2 mẫu phục hồi là rule của
+collector/sync; việc sửa description không thay đổi chúng.
+
+[Uptime history](https://support.atlassian.com/statuspage/docs/display-historical-uptime-of-components/)
+tính từ thời gian component ở major/partial outage; partial được tính trọng số
+0,3. Cột xám là ngày chưa có dữ liệu. Trạng thái hiện tại operational không xóa
+lịch sử outage hoặc làm phần trăm 90 ngày lập tức thành100%.
+
 ### Giao diện cho bước ticket tiếp theo
 
 Chưa kết nối ticket service. Nguồn đề xuất là transition **sau debounce và sau

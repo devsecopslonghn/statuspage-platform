@@ -332,3 +332,32 @@ outbox delivery.
   Không ghi nhận bốn component mới đã public. Không đổi Secret, ID, incident,
   ticket hoặc gửi thông báo. Bằng chứng xác minh được push vào main riêng bằng
   commit tài liệu sau rollout; code runtime không thay đổi.
+
+### URL ở tooltip public và rule mặc định — 2026-10-06
+
+- Theo yêu cầu bổ sung URL của user, đã review danh sách 7 component hiện hữu có
+  endpoint public, đọc mô tả mới nhất và kiểm tra không đổi kể từ preview. Chỉ
+  PATCH `description` bằng adapter admin có audit dưới actor
+  `codex-operator: user-requested public URL metadata`; giữ nội dung cũ rồi thêm
+  URL. Không thêm URL backend/private, không đổi tên/group/status/showcase/ID.
+- Applications: Website `https://drgdevlab.com/`, CR7
+  `https://cr7allgoals.com/`, Card Credit
+  `https://card-credit.apps.drgdevlab.com/`, Fund Management
+  `https://quybpdev.apps.drgdevlab.com/`. Authentication thêm URL OIDC discovery
+  đã có trong policy. External Service Access thêm ba URL probe hiện hữu; Status
+  Monitoring thêm `https://status-sync.apps.drgdevlab.com/healthz`.
+- Kiểm tra public JSON xác nhận 7 description đúng và public HTML có 7 tooltip
+  `data-original-title` tương ứng. Audit có 7 SUCCESS, mỗi record chỉ trường
+  description. Đây là văn bản URL trong tooltip, không phải link/icon component
+  có thể click. Không chạy browser login/save E2E.
+- Public summary sau cập nhật: All Systems Operational, indicator none, không
+  component/group non-operational và không incident. Heartbeat HTTP 200,
+  ok=true, last_success_at1791280545.831327. Argo Healthy; OutOfSync vẫn do các
+  ConfigMap cũ pending prune, không thay đổi tài nguyên cluster trong lượt này.
+- OPERATIONS bổ sung sự khác nhau giữa rule tổng hợp/history mặc định của
+  Statuspage và rule HTTP/readiness/debounce của collector/sync. Uptime 90 ngày vẫn
+  phản ánh lịch sử trạng thái đã ghi; không chỉnh sửa lịch sử hoặc start date.
+  Metadata hiện hữu thuộc admin, không biến config seed thành bộ đồng bộ mô tả.
+- Chỉ thay đổi tài liệu trong Git; `git diff --check` PASS. Không thay code/config
+  deployment nên không chạy lại test suite hoặc rollout; main push đã được user
+  cho phép. Jenkins và ba node vẫn pending mapping/capacity như ghi nhận trước đó.
