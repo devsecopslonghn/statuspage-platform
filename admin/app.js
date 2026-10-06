@@ -48,7 +48,63 @@ async function initSession() {
     }
 }
 
+
+function observationTime(value) {
+    return value ? new Date(value * 1000).toLocaleString('vi-VN') : 'Chưa có quan sát';
+}
+
+async function loadInventory() {
+    const summary = document.getElementById('inventory-summary');
+    const tbody = document.querySelector('#inventory-table tbody');
+    try {
+        const inventory = await apiCall('/inventory');
+        const sources = Object.entries(inventory.sources || {}).map(([kind, source]) =>
+            `${kind}: ${source.ok ? 'đọc thành công' : 'mất nguồn'} (${observationTime(source.observed_at)})`);
+        summary.textContent = `${inventory.available ? sources.join('; ') : 'Collector không có dữ liệu mới'} · Giới hạn component: ${inventory.component_limit || 'chưa xác minh; chặn tạo mới'}`;
+        tbody.textContent = '';
+        (inventory.rows || []).forEach(row => {
+            const observation = row.observation || {};
+            const tr = document.createElement('tr');
+            const conditions = Object.entries(row.conditions || {}).map(([kind, value]) => `${kind}=${value.status}`).join(', ');
+            const values = [
+                `${row.name || row.key} (${row.key})`,
+                [row.url || '', row.logo_url ? `Logo: ${row.logo_url}` : '', ...(row.aliases || []).map(url => `Alias: ${url}`), ...(row.secondary_endpoints || []).map(url => `Phụ: ${url}`)].join('\n'),
+                `${row.source || 'Chưa có nguồn'}; nguồn ${observationTime(row.source_observed_at)}; thấy cuối ${observationTime(row.last_seen_at)}`,
+                `${row.check_type || ''}; ${row.assurance || ''}; HTTP expected ${JSON.stringify(row.expected_status || [])}; redirect ${row.redirect || ''}`,
+                `${observation.status || 'unknown'}: ${observation.reason || 'Chưa có quan sát'}; ${observationTime(observation.observed_at)}; HTTP ${observation.http_status ?? '-'}; ${conditions}${observation.cordoned ? '; cordoned' : ''}`,
+                `${row.publication}; ${row.component_id || 'chưa gắn ID'}${row.sync ? `; sync ${row.sync.stale ? 'stale' : row.sync.final_status || 'đang debounce'}; public ${row.sync.statuspage_status}; ${row.sync.write_error || row.sync.reason}; ${observationTime(row.sync.observed_at)}` : ''}`
+            ];
+            values.forEach((value, index) => {
+                const td = document.createElement('td');
+                if (index === 1) {
+                    value.split('\n').filter(Boolean).forEach(line => {
+                        const url = line.replace(/^(Alias|Phụ|Logo): /, '');
+                        try {
+                            const target = new URL(url);
+                            if (target.protocol !== 'https:' || target.username || target.password) throw new Error('Unsafe URL');
+                            const link = document.createElement('a');
+                            link.href = target.href;
+                            link.target = '_blank';
+                            link.rel = 'noopener noreferrer';
+                            link.textContent = line;
+                            td.appendChild(link);
+                        } catch (_) { td.appendChild(document.createTextNode(line)); }
+                        td.appendChild(document.createElement('br'));
+                    });
+                } else { td.textContent = value; }
+                td.style.whiteSpace = 'pre-line';
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        tbody.textContent = '';
+        summary.textContent = 'Không thể đọc inventory; dữ liệu hiện tại không xác định.';
+    }
+}
+
 async function loadData() {
+    await loadInventory();
     try {
         const data = await apiCall('/overview');
         // Update Page Form

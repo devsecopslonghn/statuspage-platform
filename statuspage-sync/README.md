@@ -8,9 +8,8 @@ library; it exposes a minimal heartbeat, not a portal.
 
 ```bash
 python3 -m unittest discover -s tests
-kubectl kustomize statuspage-sync
+kubectl kustomize deploy
 STATUSPAGE_API_KEY_FILE=/private/path/key python3 statuspage-sync/provision.py
-STATUSPAGE_API_KEY_FILE=/private/path/key python3 statuspage-sync/provision.py --apply
 STATUSPAGE_API_KEY_FILE=/private/path/key python3 statuspage-sync/sync.py --config statuspage-sync/config.json --mode external --once --dry-run
 ```
 
@@ -33,3 +32,11 @@ it does not reveal URLs, component states, query text, or credentials.
 Change health checks through Git and verify them before merge. Monitor API errors
 and both execution histories. A completed sync means observations reached
 Statuspage, even when the observed application itself is down.
+
+Discovery uses `collector/policy.json` and the separate read-only collector.
+`inventory.py` defines the version1 snapshot contract, URL safety and freshness.
+Existing IDs remain in config; additional approved mappings live in policy.
+`provision_discovery.py` previews/adopts/creates only approved pending mappings
+with verified component capacity. It runs only as an explicitly authorized operator
+command, never in sync/collector. Legacy seed apply is blocked with discovery on.
+See the operations runbook for fresh snapshots, registry persistence and rollout.

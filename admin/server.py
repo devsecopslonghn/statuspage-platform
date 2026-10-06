@@ -15,12 +15,14 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, os.environ.get('SYNC_MODULE_DIR', str(Path(__file__).resolve().parents[1] / 'statuspage-sync')))
 from sync import StatuspageClient
+from inventory import effective_observation, fetch_inventory, fetch_sync_observations, fresh, load_policy
 
 PAGE_ID = 'hsyg2r4ql1pr'
 ADMIN_GROUP = os.environ.get('ADMIN_GROUP', '/k8s-cluster-admins')
 PUBLIC_ORIGIN = os.environ.get('PUBLIC_ORIGIN', 'https://status-admin.apps.drgdevlab.com')
 DATA_DIR = os.environ.get('DATA_DIR', '/data')
 CONFIG_PATH = os.environ.get('CONFIG_PATH', '')
+DISCOVERY_CONFIG_PATH = os.environ.get('DISCOVERY_CONFIG_PATH', '')
 api_lock = threading.RLock()
 cache = {'overview': None, 'timestamp': 0}
 client = StatuspageClient(PAGE_ID, False)
@@ -103,7 +105,7 @@ def validate_fields(data, kind):
 
 def fetch_all_components():
     result = []
-    for number in range(1, 11):
+    for number in range(1, 13):
         batch = client._request('GET', f'/components?page={number}&per_page=100')
         if not isinstance(batch, list) or any(c.get('page_id') != PAGE_ID for c in batch):
             raise RuntimeError('Component page mismatch')
@@ -133,6 +135,54 @@ def fetch_overview():
             'incidents': [{'name': i.get('name'), 'status': i.get('status'),
                            'shortlink': i.get('shortlink') if validate_url(i.get('shortlink')) else None}
                           for i in incidents], 'observed_at': int(time.time())}
+
+def fetch_discovery_inventory():
+    if not DISCOVERY_CONFIG_PATH:
+        return {'available': False, 'reason': 'discovery_not_configured', 'rows': []}
+    policy = load_policy(DISCOVERY_CONFIG_PATH)
+    rules = {r['key']: r for r in policy['applications'] + policy.get('nodes', [])}
+    try:
+        snapshot = fetch_inventory(os.environ.get('INVENTORY_URL', 'http://statuspage-collector.statuspage.svc.cluster.local:8082/inventory'))
+    except Exception:
+        snapshot = {'generated_at': 0, 'sources': {}, 'rows': []}
+    try:
+        sync_observations = fetch_sync_observations()
+    except Exception:
+        sync_observations = {}
+    rows = {r['key']: r for r in snapshot['rows']}
+    for key, rule in rules.items():
+        rows.setdefault(key, {'key': key, 'name': rule['name'], 'source_observed_at': 0})
+    result = []
+    fields = ('key', 'name', 'kind', 'source', 'url', 'aliases', 'secondary_endpoints', 'resources',
+              'configured_resources', 'source_observed_at', 'last_seen_at', 'present', 'check_type', 'assurance',
+              'expected_status', 'redirect', 'probe_allowed')
+    for key, row in sorted(rows.items()):
+        entry = {field: row.get(field) for field in fields}
+        rule = rules.get(key, {})
+        entry['logo_url'] = rule.get('logo_url')
+        entry.update(component_id=rule.get('component_id'), publish=rule.get('publish', False),
+                     retired=rule.get('retired', False), publication='retired' if rule.get('retired') else
+                     ('public' if rule.get('publish') and rule.get('component_id') else
+                      'approved_pending_mapping' if rule.get('publish') else 'internal_only'))
+        obs = effective_observation(row, policy)
+        entry['observation'] = {field: obs.get(field) for field in
+                                ('status', 'reason', 'observed_at', 'http_status', 'latency_ms', 'redirect_hops', 'cordoned')}
+        entry['conditions'] = {kind: {field: value.get(field) for field in
+                                      ('status', 'reason', 'lastHeartbeatTime', 'lastTransitionTime')}
+                               for kind, value in obs.get('conditions', {}).items()
+                               if kind in ('Ready', 'MemoryPressure', 'DiskPressure', 'PIDPressure', 'NetworkUnavailable')}
+        sync_value = sync_observations.get(key, {})
+        if sync_value.get('component_id') == rule.get('component_id') and rule.get('component_id'):
+            entry['sync'] = {field: sync_value.get(field) for field in
+                             ('raw_status', 'final_status', 'statuspage_status', 'reason', 'observed_at', 'manual_control', 'check_results', 'write_error')}
+            entry['sync']['stale'] = not fresh(sync_value.get('observed_at'), time.time(), policy['stale_seconds'])
+        result.append(entry)
+    return {'available': fresh(snapshot.get('generated_at'), time.time(), policy['stale_seconds']), 'generated_at': snapshot.get('generated_at', 0),
+            'component_limit': policy.get('component_limit'), 'component_limit_evidence': policy.get('component_limit_evidence'),
+            'sources': {kind: {'ok': value.get('ok') is True and fresh(value.get('observed_at'), time.time(), policy['stale_seconds']),
+                               'observed_at': value.get('observed_at'), 'stale': not fresh(value.get('observed_at'), time.time(), policy['stale_seconds'])}
+                        for kind, value in snapshot.get('sources', {}).items() if kind in ('node', 'ingress')}, 'rows': result}
+
 
 def get_cached_overview(force=False):
     with api_lock:
@@ -227,6 +277,8 @@ class AdminHandler(BaseHTTPRequestHandler):
             if self.path == '/api/session':
                 return self.respond(200, {'csrf_token': generate_csrf_token(identity),
                                           'user': self.headers['X-Forwarded-User']})
+            if self.path == '/api/inventory':
+                return self.respond(200, fetch_discovery_inventory())
             if self.path == '/api/overview':
                 return self.respond(200, get_cached_overview())
             if self.path == '/api/audit':

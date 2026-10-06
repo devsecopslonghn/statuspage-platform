@@ -9,6 +9,7 @@ configMapGenerator:
   - name: statuspage-sync-code
     files:
       - sync.py
+      - inventory.py
   - name: statuspage-sync-config
     files:
       - config.json

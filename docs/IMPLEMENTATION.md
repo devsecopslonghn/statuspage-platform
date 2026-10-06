@@ -166,3 +166,112 @@ Các lượt triển khai/rà soát và xử lý nhận xét chi tiết ở [REV
 - Không khôi phục monitoring, không cấp token/RBAC cho sync, không tạo incident
   hoặc gửi subscriber test notification. Kiểm chứng endpoint/runtime read-only;
   chưa chạy unit/browser tests theo chỉ dẫn của repo.
+
+## Discovery ứng dụng và Kubernetes Node — 2026-10-06 (patch local)
+
+### Thay đổi và phạm vi
+
+- Collector riêng Python stdlib, chỉ get/list/watch Ingress/Node, không Secrets,
+  write Kubernetes hoặc Statuspage key. Snapshot version1 nội bộ, inventory SQLite
+  retained PVC, source lỗi/stale/missing/retired tách rõ; không xóa component/history.
+- Canonical/alias/endpoint phụ theo Ingress host/path/TLS và policy đã review;
+  override ngoài Kubernetes, include/exclude và public approval riêng inventory.
+  URL GET xác minh TLS, DNS pin, allowlist và hard deadline subprocess; không dò
+  endpoint readiness. Exact private Auth ingress exception theo CoreDNS live.
+- Sync nhận snapshot; giữ backend readiness thật, một writer, debounce3/2 có
+  dedupe cả failure/recovery snapshot lặp, incident/maintenance precedence và
+  redirect-denied API. Missing/stale/malformed không thành operational.
+- Admin SSO/loopback/CSRF/field allowlists giữ nguyên; thêm inventory URL/source,
+  timestamp, check scope, lý do/Node conditions, mapping/public approval và
+  sync telemetry nội bộ (readiness/content failure, raw/final/debounce/incident). Metadata
+  admin không bị sync hoặc provisioner mới reset. Legacy seed apply có guard.
+- Provisioner explicit preview/adopt/create mapping được duyệt; fail closed khi
+  capacity chưa biết; no ambiguous POST retry, output IDs atomic. Jenkins được
+  người dùng duyệt public trong lượt làm này; logo URL được lưu như tham chiếu
+  tĩnh. Ba Node mapping được duyệt theo objective, còn chờ component ID thật.
+
+### Evidence chỉ đọc
+
+Collector code mới chạy local từ live Kubernetes GET lúc `2026-10-06T08:59:47.295795+00:00`
+trên context `k8s-admin-public`: **17 Ingress, 23 route**, tất cả17Ingress được
+đối chiếu vào16application rows; cộng website external override thành17application
+rows và3Node rows, tổng20. Không tạo/mất live resource để thử.
+
+| Ingress thực tế | Mapping | Check URL thực tế | Kết quả | Public / lý do loại |
+|---|---|---|---|---|
+| `keycloak/keycloak` | `authentication` | `https://auth.apps.drgdevlab.com/realms/kubernetes/.well-known/openid-configuration` | 200 | Đã duyệt; ID hiện hữu |
+| `card-credit/card-credit` | `card-credit` | `https://card-credit.apps.drgdevlab.com/` | 200 | Đã duyệt; ID hiện hữu |
+| `cr7allgoals/cr7allgoals` | `cr7allgoals` | `https://cr7allgoals.com/` | 200 | Đã duyệt; ID hiện hữu |
+| `fund-management/fund-management` | `fund-management` | `https://quybpdev.apps.drgdevlab.com/` | 200 | Đã duyệt; ID hiện hữu |
+| `fund-management/fund-management-mcp` | `fund-management` | `https://quybpdev.apps.drgdevlab.com/` | 200 | Đã duyệt; ID hiện hữu |
+| `argocd/argocd-server` | `ingress/argocd/argocd-server` | `https://argocd.apps.drgdevlab.com/` | 200 | Chưa được duyệt public; giữ nội bộ |
+| `bytebase/bytebase` | `ingress/bytebase/bytebase` | `https://bytebase.apps.drgdevlab.com/` | 200 | Chưa được duyệt public; giữ nội bộ |
+| `db-poc/db-poc` | `ingress/db-poc/db-poc` | `https://db-poc.apps.drgdevlab.com/` | 200 | Chưa được duyệt public; giữ nội bộ |
+| `identity-console/console` | `ingress/identity-console/console` | `https://console.apps.drgdevlab.com/` | 200 | Chưa được duyệt public; giữ nội bộ |
+| `identity-console/headlamp` | `ingress/identity-console/headlamp` | `https://headlamp.apps.drgdevlab.com/` | 200 | Chưa được duyệt public; giữ nội bộ |
+| `nebula-control/nebula-control-ui` | `ingress/nebula-control/nebula-control-ui` | `https://nebula-control.apps.drgdevlab.com/` | 200 | Chưa được duyệt public; giữ nội bộ |
+| `oceanbase-odc/oceanbase-odc` | `ingress/oceanbase-odc/oceanbase-odc` | `https://oceanbase.apps.drgdevlab.com/` | 200 | Chưa được duyệt public; giữ nội bộ |
+| `oracle-management/oracle-management` | `ingress/oracle-management/oracle-management` | `https://oracle-management.apps.drgdevlab.com/` | 302 / redirect host denied | Chưa được duyệt public; giữ nội bộ |
+| `sonarqube/sonarqube` | `ingress/sonarqube/sonarqube` | `https://sonarqube.apps.drgdevlab.com/` | 200 | Chưa được duyệt public; giữ nội bộ |
+| `statuspage/statuspage-admin` | `ingress/statuspage/statuspage-admin` | `https://status-admin.apps.drgdevlab.com/` | excluded: Admin SSO endpoint; excluded from synthetic application checks and public publication | Không probe/public: Admin SSO endpoint; excluded from synthetic application checks and public publication |
+| `statuspage/statuspage-sync-health` | `ingress/statuspage/statuspage-sync-health` | `https://status-sync.apps.drgdevlab.com/healthz` | excluded: Independent watchdog owns monitoring; prevent recursive collector health checks | Không probe/public: Independent watchdog owns monitoring; prevent recursive collector health checks |
+| `jenkins/jenkins` | `jenkins` | `https://jenkins.apps.drgdevlab.com/` | 403 | Đã duyệt; pending ID |
+| `External override (không Ingress)` | `main-page` | `https://drgdevlab.com/` | 200 | Đã duyệt; ID hiện hữu |
+
+CR7 `www` là alias do policy duyệt; `/api` là endpoint phụ. Card Credit `/docs`,
+`/mcp` là phụ. Fund Management MCP được nhóm vào cùng app, không tạo duplicate;
+root MCP404 trong audit đầu không thay kết quả canonical app. Auth hostname
+`database-manager-auth` là endpoint phụ, không tự public thêm. Chỉ canonical URL
+được probe theo rule; bảng inventory admin vẫn hiện23routes qua alias/phụ.
+Jenkins root403 TLS hợp lệ là failed URL availability; logo SVG200 với TLS hợp lệ
+chỉ chứng minh static asset, không thay bằng Jenkins/backend healthy. Oracle
+Management redirect sang host khác bị deny mặc định; cần owner duyệt SSO rule
+nếu muốn probe login, không nới redirect toàn cục.
+
+| Kubernetes Node | Ready | Memory/Disk/PIDPressure | Ready heartbeat UTC | Raw mapping |
+|---|---|---|---|---|
+| k8s-master | True | False/False/False | 2026-10-06T08:55:56Z | operational (ready_no_pressure) |
+| k8s-worker1 | True | False/False/False | 2026-10-06T08:59:19Z | operational (ready_no_pressure) |
+| k8s-worker2 | True | False/False/False | 2026-10-06T08:56:53Z | operational (ready_no_pressure) |
+
+Cả ba node non-cordoned ở snapshot này. Node observation lấy đúng Node API,
+không dùng `/readyz` hay Longhorn. Không kết luận sức khỏe mọi workload/nghiệp vụ.
+Public page trước patch có9components +3groups; GET Manage page được sanitize,
+không chứa plan/limit fields. Không đoán gói Free/hạn mức25; `component_limit`
+đangnull và create bị chặn. Quota tính bảo thủ cả group;9+3+4=16slot cần được
+operator xác minh. AppProject live đã allow Statuspage repo và cluster RBAC;
+root checkout có drift cũ và thay đổi người dùng, không sửa file của root repo.
+
+### Kiểm chứng
+
+- Local suite66tests PASS, gồm46tests ban đầu/collector rồi bổ sung writer/admin/
+  provisioning/deadline/private scope, admin route gate và SQLite restart retention. Bao phủ URL fail, TLS/timeout/redirect/SSRF,
+  stale/future/malformed, NotReady/Unknown/pressure/cordon/retirement, new/missing
+  resource, history/IDs, dedupe failure/recovery, source unavailable, expiry trong lúc đọc Management API, writer
+  ownership, incident/maintenance, capacity và no-POST-retry registry.
+- Probe code runtime bounded worker chạy thật trên URL canonical live; Jenkins
+  root403/logo200, ba node riêng Ready/no pressure. Các app/admin200 chỉ là URL
+  availability; backend checks giữ nguyên nhưng chưa chạy lại live trong pod mới.
+- Production/staging Kustomize render PASS, Python syntax/config/policy validation,
+  JavaScript `node --check`, `git diff --check` PASS. Review delegated code/manifests
+  xong, sửa repeated failure samples, hard DNS deadline, source freshness summary,
+  collector error readiness reachability và hash ConfigMap rollout.
+- Không chạy browser login/save E2E, server-side apply/dry-run hoặc tạo tài nguyên
+  test trong production. Chưa chứng minh network/RBAC/pod runtime sau rollout;
+  cần kiểm tra read-only sau khi được phép triển khai.
+
+### Phần còn lại và giao diện ticket
+
+Patch local sẵn để review; chưa commit/push/merge/deploy, thay Secret, tạo component,
+incident/ticket hoặc gửi notification. Cần xác minh capacity, preview/provision
+Jenkins+3node hoặc adopt IDs có sẵn, giữ registry vào Git, rồi xin duyệt rollout.
+Chưa có live component riêng của ba node/Jenkins: không ghi nhận nghiệm thu public
+rollout hoàn thành. URL/logo trong component description là tham chiếu; API không
+có field per-component URL/icon và custom HTML không hiển thị trên subdomain
+statuspage.io. Clickable directory/icon public cần UI/domain decision, không giả
+vờ tooltip là portal click-to-open. Admin có clickable URL/logo để vận hành.
+
+Event v1/lifecycle cho bước `health_failure -> ticket/incident -> investigating
+-> fix_deployed -> verification -> recovered` được ghi trong OPERATIONS. Chưa
+chọn/đoán Jira/GitHub Issues, chưa kết nối external ticket service hoặc đảm bảo
+outbox delivery.

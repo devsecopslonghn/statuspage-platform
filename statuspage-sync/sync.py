@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import argparse
 import concurrent.futures
+import copy
 import json
 import logging
 import math
 import os
+from pathlib import Path
 import re
 import signal
 import ssl
@@ -17,6 +19,8 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, List, Optional, Tuple
 
+from inventory import effective_observation, fetch_inventory, fresh, load_policy
+
 logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
 
 app_state = {
@@ -24,7 +28,8 @@ app_state = {
     'cycles_total': 0,
     'cycles_failed': 0,
     'stale_seconds': 180,
-    'running': True
+    'running': True,
+    'observations': {}
 }
 app_state_lock = threading.Lock()
 shutdown_event = threading.Event()
@@ -218,7 +223,7 @@ class StatuspageClient:
             return k.strip()
         raise ValueError("Missing STATUSPAGE_API_KEY")
 
-    def _request(self, method: str, path: str, data: dict = None, is_mutation: bool = False):
+    def _request(self, method: str, path: str, data: dict = None, is_mutation: bool = False, retry: bool = True):
         if method != 'GET':
             is_mutation = True
         if is_mutation:
@@ -236,7 +241,8 @@ class StatuspageClient:
         req = urllib.request.Request(url, data=req_data, headers=headers, method=method)
 
         backoff = 1.0
-        for attempt in range(4):
+        attempts = 4 if retry else 1
+        for attempt in range(attempts):
             with self.mutation_lock:
                 elapsed = time.monotonic() - self.last_mutation_time
                 if elapsed < 1.5:
@@ -250,14 +256,14 @@ class StatuspageClient:
                     return json.loads(resp_body.decode('utf-8'))
             except urllib.error.HTTPError as e:
                 if e.code in (420, 429, 500, 502, 503, 504):
-                    if attempt == 3:
+                    if attempt == attempts - 1:
                         raise Exception(f"Statuspage HTTPError {e.code}")
                     time.sleep(backoff)
                     backoff = min(backoff * 2, 16.0)
                 else:
                     raise Exception(f"Statuspage HTTPError {e.code}")
             except Exception as e:
-                if attempt == 3:
+                if attempt == attempts - 1:
                     raise Exception("Statuspage API request failed")
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 16.0)
@@ -283,13 +289,18 @@ class StatuspageClient:
         return list(incident_comp_ids), list(maint_comp_ids)
 
     def get_components(self) -> dict:
-        comps = self._request("GET", "/components?per_page=100")
         result = {}
-        for c in comps:
-            if c.get('page_id') != self.page_id:
-                raise Exception("Page ID mismatch in component")
-            result[c['id']] = c
-        return result
+        for number in range(1, 13):
+            comps = self._request('GET', f'/components?per_page=100&page={number}')
+            if not isinstance(comps, list):
+                raise ValueError('Invalid component list')
+            for c in comps:
+                if c.get('page_id') != self.page_id:
+                    raise Exception('Page ID mismatch in component')
+                result[c['id']] = c
+            if len(comps) < 100:
+                return result
+        raise ValueError('Component pagination limit exceeded')
 
     def update_component(self, comp_id: str, status: str):
         self._request("PATCH", f"/components/{comp_id}", data={"component": {"status": status}}, is_mutation=True)
@@ -302,6 +313,7 @@ class ComponentManager:
     def __init__(self, comp_config: dict):
         self.config = comp_config
         self.state = None
+        self.last_inventory_observed_at = 0
         self.consec_counts = {"operational": 0, "partial_outage": 0, "major_outage": 0, "degraded_performance": 0}
 
     def process_raw_status(self, raw_status: str, failure_threshold: int, recovery_threshold: int, is_daemon_internal: bool) -> str:
@@ -344,6 +356,14 @@ class HealthServerHandler(BaseHTTPRequestHandler):
             self.send_header('Cache-Control', 'no-store')
             self.end_headers()
             self.wfile.write(json.dumps(data).encode('utf-8'))
+        elif self.path == '/observations':
+            with app_state_lock:
+                data = {'version': 1, 'components': copy.deepcopy(app_state['observations'])}
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode('utf-8'))
         elif self.path == '/metrics':
             with app_state_lock:
                 data = (f"statuspage_sync_cycles_total {app_state['cycles_total']}\n"
@@ -357,11 +377,75 @@ class HealthServerHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+def discovery_cycle_config(config, managers):
+    """Trusted policy owns publication/IDs; collector payload only supplies observations."""
+    policy = load_policy(os.environ.get('DISCOVERY_CONFIG_PATH', str(Path(__file__).resolve().parents[1] / 'collector/policy.json')))
+    try:
+        snapshot = fetch_inventory(os.environ.get('INVENTORY_URL', 'http://statuspage-collector.statuspage.svc.cluster.local:8082/inventory'))
+    except Exception:
+        snapshot = {'sources': {}, 'rows': []}
+    rows = {row['key']: row for row in snapshot['rows']}
+    source_ok = all(snapshot.get('sources', {}).get(kind, {}).get('ok') is True
+                    and fresh(snapshot['sources'][kind].get('observed_at'), time.time(), policy['stale_seconds'])
+                    for kind in ('ingress', 'node'))
+    result = copy.deepcopy(config)
+    by_id = {comp['id']: comp for comp in result['components']}
+    by_key = {comp['key']: comp for comp in result['components']}
+    external_ids = {comp['id'] for comp in result['components'] if comp.get('mode') == 'external'}
+    rules = {r['key']: r for r in policy['applications'] + policy.get('nodes', [])}
+    for comp in result['components']:
+        if comp.get('inventory_key'):
+            rule = rules.get(comp['inventory_key'], {})
+            if rule.get('component_id') != comp['id'] or not rule.get('publish'):
+                raise ValueError('Existing inventory mapping changed; explicit retirement/migration required')
+    for key, rule in rules.items():
+        cid = rule.get('component_id')
+        if not rule.get('publish') or not cid:
+            continue
+        if cid in external_ids:
+            raise ValueError('Discovery cannot claim an external writer component')
+        comp = by_id.get(cid)
+        if comp is not None and comp.get('inventory_key') != key:
+            raise ValueError('Discovery component mapping conflict')
+        if comp is None:
+            if key in by_key:
+                raise ValueError('Discovery key conflict')
+            comp = {'key': key, 'id': cid, 'mode': 'internal', 'inventory_key': key,
+                    'checks': [{'type': 'inventory', 'key': key}], 'failure_status': 'major_outage'}
+            result['components'].append(comp)
+            by_key[key] = comp
+        if rule.get('retired'):
+            comp['_retired'] = True
+            continue
+        row = rows.get(key, {})
+        obs = effective_observation(row, policy)
+        # A source can fail independently of the last good row payload.
+        kind = 'node' if key.startswith('node/') else 'ingress'
+        if rule.get('source') != 'external' and not (snapshot.get('sources', {}).get(kind, {}).get('ok') is True
+                and fresh(snapshot['sources'][kind].get('observed_at'), time.time(), policy['stale_seconds'])):
+            obs = {'status': 'degraded_performance', 'reason': kind + '_source_unavailable'}
+        if obs.get('reason') in ('source_stale', 'observation_stale', 'invalid_observation',
+                                 'ingress_source_unavailable', 'node_source_unavailable'):
+            source_ok = False
+        times = [row.get('source_observed_at'), obs.get('observed_at')]
+        comp['_inventory_expiry'] = min(times) + policy['stale_seconds'] if all(type(value) in (float,int) and math.isfinite(value) for value in times) else 0
+        comp['_inventory_observation'] = obs
+        managers.setdefault(comp['key'], ComponentManager(comp))
+    return result, source_ok
+
+
 def run_sync_cycle(config: dict, sp: StatuspageClient, comp_managers: dict, mode: str, is_once: bool) -> bool:
+    discovery_ok = True
+    if mode == 'internal' and config.get('discovery', {}).get('enabled'):
+        try:
+            config, discovery_ok = discovery_cycle_config(config, comp_managers)
+        except Exception:
+            logging.error(json.dumps({'msg': 'Discovery policy/configuration failed'}))
+            return False
     is_external_once = mode == 'external' and is_once
 
     def run_checks(comp):
-        if comp.get('mode', 'internal') != mode:
+        if comp.get('mode', 'internal') != mode or comp.get('_retired'):
             return comp['key'], None, []
 
         results = []
@@ -372,6 +456,11 @@ def run_sync_cycle(config: dict, sp: StatuspageClient, comp_managers: dict, mode
                 results.append(success)
                 if lat is not None:
                     latencies.append(lat)
+            elif chk.get('type') == 'inventory':
+                obs = comp.get('_inventory_observation', {})
+                results.append(obs.get('status') == 'operational')
+                if obs.get('status') == 'operational' and type(obs.get('latency_ms')) in (int, float):
+                    latencies.append(obs['latency_ms'])
             elif chk.get('type') == 'prometheus':
                 success = check_prometheus(chk)
                 results.append(success)
@@ -410,6 +499,11 @@ def run_sync_cycle(config: dict, sp: StatuspageClient, comp_managers: dict, mode
             continue
 
         results, latencies = check_outputs[key]
+        if comp.get('inventory_key') and time.time() > comp.get('_inventory_expiry', 0):
+            comp['_inventory_observation'] = {'status': 'degraded_performance', 'reason': 'observation_stale'}
+            results = [False if check['type'] == 'inventory' else result for check, result in zip(comp['checks'], results)]
+            latencies = []
+            discovery_ok = False
         all_executed_checks += len(results)
         all_passed_checks += sum(1 for r in results if r)
         all_latencies.extend(latencies)
@@ -423,28 +517,61 @@ def run_sync_cycle(config: dict, sp: StatuspageClient, comp_managers: dict, mode
         else:
             raw_status = comp.get('failure_status', 'major_outage')
 
+        obs = comp.get('_inventory_observation', {})
+        if obs.get('status') == 'degraded_performance' or key.startswith('node/'):
+            raw_status = obs.get('status', 'degraded_performance')
+
         is_daemon_internal = (not is_once) and (mode == 'internal')
         mgr = comp_managers[key]
         comp_id = comp['id']
         sp_status = sp_comps[comp_id]['status']
+        reason = obs.get('reason') or ('all_checks_passed' if all(results) else 'configured_check_failed')
+        if comp.get('inventory_key') and any(not passed for check, passed in zip(comp['checks'], results) if check['type'] != 'inventory'):
+            reason = 'additional_readiness_or_content_check_failed'
+        observed = {'component_id': comp_id, 'raw_status': raw_status, 'statuspage_status': sp_status,
+                    'reason': reason, 'observed_at': time.time(), 'check_results': results,
+                    'manual_control': False, 'final_status': None}
         if '*' in incident_ids or '*' in maint_ids or comp_id in incident_ids or comp_id in maint_ids or sp_status == 'under_maintenance':
             mgr.state = None
+            mgr.last_inventory_observed_at = 0
             mgr.consec_counts = dict.fromkeys(mgr.consec_counts, 0)
+            observed['manual_control'] = True
+            observed['reason'] = 'active_incident_or_maintenance'
+            with app_state_lock:
+                app_state['observations'][key] = observed
             logging.info(json.dumps({'component': key, 'manual_control': True}))
             continue
-        final_status = mgr.process_raw_status(raw_status, config.get('failure_threshold', 3), config.get('recovery_threshold', 2), is_daemon_internal)
+        observation_time = obs.get('observed_at', 0)
+        if obs.get('reason') in ('source_stale', 'observation_stale', 'invalid_observation',
+                                  'ingress_source_unavailable', 'node_source_unavailable'):
+            observation_time = time.time()  # This cycle independently observed unavailable/stale data.
+        if (is_daemon_internal and comp.get('inventory_key')
+                and observation_time <= mgr.last_inventory_observed_at):
+            final_status = mgr.state  # Re-reading one collector observation is not another failure/recovery sample.
+        else:
+            final_status = mgr.process_raw_status(raw_status, config.get('failure_threshold', 3), config.get('recovery_threshold', 2), is_daemon_internal)
+            if comp.get('inventory_key') and type(observation_time) in (float, int):
+                mgr.last_inventory_observed_at = observation_time
 
+        observed['final_status'] = final_status
+        with app_state_lock:
+            app_state['observations'][key] = observed
         logging.info(json.dumps({
             "component": key,
             "raw_status": raw_status,
             "final_status": final_status,
-            "sp_status": sp_status
+            "sp_status": sp_status,
+            "reason": reason
         }))
 
         if final_status is not None and sp_status != final_status:
             try:
                 sp.update_component(comp_id, final_status)
+                with app_state_lock:
+                    app_state['observations'][key]['statuspage_status'] = final_status
             except Exception as e:
+                with app_state_lock:
+                    app_state['observations'][key]['write_error'] = 'statuspage_write_failed'
                 logging.error(json.dumps({"msg": f"Failed to update component {key}", "error": str(e)}))
                 return False
 
@@ -466,7 +593,7 @@ def run_sync_cycle(config: dict, sp: StatuspageClient, comp_managers: dict, mode
         logging.error(json.dumps({"msg": "Failed to update metrics", "error": str(e)}))
         return False
 
-    return True
+    return discovery_ok
 
 def validate_config(config):
     if not re.fullmatch(r'[a-zA-Z0-9_-]+', config.get('page_id', '')):
@@ -490,6 +617,10 @@ def validate_config(config):
             raise ValueError('Invalid component failure status')
         for check in comp['checks']:
             kind = check.get('type')
+            if kind == 'inventory':
+                if mode != 'internal' or check.get('key') != comp.get('inventory_key'):
+                    raise ValueError('Invalid inventory check ownership')
+                continue
             if kind not in ('http', 'prometheus'):
                 raise ValueError('Unknown check type')
             parsed = urllib.parse.urlparse(check.get('url', ''))

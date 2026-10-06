@@ -3,5 +3,6 @@ kind: Kustomization
 resources:
   - ../statuspage-sync
   - ../admin
+  - ../collector
   - platform
   - probes
