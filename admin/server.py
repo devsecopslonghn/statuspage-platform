@@ -210,11 +210,8 @@ def mutate(kind, target, data, user):
             gid = data.get('group_id')
             if gid is not None and not any(g['id'] == gid for g in overview['groups']):
                 raise ValidationError('Nhóm không thuộc trang này.')
-            # Statuspage documents the literal string "null" for ungrouping.
-            values = dict(data)
-            if 'group_id' in values and values['group_id'] is None:
-                values['group_id'] = 'null'
-            path, payload = '/components/' + target, {'component': values}
+            # Keep JSON null distinct from a string that would be looked up as a group ID.
+            path, payload = '/components/' + target, {'component': dict(data)}
         else:
             if not any(g['id'] == target for g in overview['groups']):
                 raise ValidationError('Nhóm không thuộc trang này.')

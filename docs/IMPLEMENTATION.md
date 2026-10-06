@@ -398,3 +398,15 @@ outbox delivery.
   worker2 `1f3xssf9b10f`. Merge đúng4mapping vào policy Git;5mapping ứng dụng cũ
   giữ nguyên. Public health sẽ do sync xác nhận sau rollout mapping, không PATCH
   xanh thủ công. Policy validation và production/staging render PASS.
+
+#### Sửa lỗi tách group phát hiện khi kiểm tra live
+
+- Lượt đổi layout đầu tiên cập nhật page context thành công nhưng tách API khỏi
+  group trả404: adapter cũ chuyển JSON null thành chuỗi `"null"`. Mô tả API nói
+  "null" nhưng live JSON string không được chấp nhận. Component không bị đổi
+  từng phần sau lỗi. Sửa adapter giữ JSON null; route regression16tests PASS.
+- Chạy đúng adapter đã sửa với payload review: API/etcd được tách group,
+  `group_id=null`, showcase=false, tên/mô tả đúng và status vẫn operational.
+  Audit ghi SUCCESS. Đây là thao tác metadata đã được user yêu cầu, không phải
+  thử outage. UI inventory đổi chữ thành "Trần công bố cấu hình (tính cả group)"
+  để không nhầm cap25 là gói billing thực tế.

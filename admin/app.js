@@ -60,7 +60,7 @@ async function loadInventory() {
         const inventory = await apiCall('/inventory');
         const sources = Object.entries(inventory.sources || {}).map(([kind, source]) =>
             `${kind}: ${source.ok ? 'đọc thành công' : 'mất nguồn'} (${observationTime(source.observed_at)})`);
-        summary.textContent = `${inventory.available ? sources.join('; ') : 'Collector không có dữ liệu mới'} · Giới hạn component: ${inventory.component_limit || 'chưa xác minh; chặn tạo mới'}`;
+        summary.textContent = `${inventory.available ? sources.join('; ') : 'Collector không có dữ liệu mới'} · Trần công bố cấu hình (tính cả group): ${inventory.component_limit || 'chưa xác minh; chặn tạo mới'}`;
         tbody.textContent = '';
         (inventory.rows || []).forEach(row => {
             const observation = row.observation || {};

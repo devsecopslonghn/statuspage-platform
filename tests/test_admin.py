@@ -152,7 +152,7 @@ class AdminHTTPTests(unittest.TestCase):
 
     def test_component_ungroup_and_showcase(self):
         self.assertEqual(self.request('PATCH','/api/components/c1',{'group_id':None,'showcase':False})[0],200)
-        self.api._request.assert_any_call('PATCH','/components/c1',data={'component':{'group_id':'null','showcase':False}},is_mutation=True)
+        self.api._request.assert_any_call('PATCH','/components/c1',data={'component':{'group_id':None,'showcase':False}},is_mutation=True)
 
     def test_group_rename_preserves_members(self):
         self.assertEqual(self.request('PATCH','/api/groups/g1',{'name':'Services'})[0],200)
