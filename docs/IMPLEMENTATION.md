@@ -275,3 +275,32 @@ Event v1/lifecycle cho bước `health_failure -> ticket/incident -> investigati
 -> fix_deployed -> verification -> recovered` được ghi trong OPERATIONS. Chưa
 chọn/đoán Jira/GitHub Issues, chưa kết nối external ticket service hoặc đảm bảo
 outbox delivery.
+
+
+## Điều tra Partial System Outage sau rollout discovery — 2026-10-06
+
+- Lượt này chỉ đọc cluster/Statuspage và chuẩn bị bản sửa; không đổi status bằng
+  tay, tạo incident hoặc patch workload. User đã merge PR6; Argo main revision
+  `33dff3100ef130da18838063b283df49abcada7a`, operation Succeeded/Healthy.
+- Public: Website major_outage; CR7/Card Credit/Fund/Auth partial_outage; cluster,
+  storage và hai external component operational. Không có incident/maintenance.
+  Heartbeat200 `ok=true`: sync ghi được observations nhưng không có nghĩa URL
+  checks đều healthy. Ba Kubernetes node Ready.
+- Collector Ingress/Node sources fresh; tất cả URL probe có
+  `probe_deadline_exceeded`. Sync telemetry xác nhận URLfalse, readiness/content
+  checks true cho các ứng dụng/Auth: nguồn outage hiện tại là URL probe collector.
+- Collector CPU limit250m,8subprocess đồng thời. Cgroup snapshot:
+  `nr_throttled=1335/nr_periods=1474`, `throttled_usec=510950026` (thời gian cộng
+  dồn, không suy thành tỷ lệ thời gian wall-clock). Direct GET website trong chính
+  pod đạt200~421ms; một worker bounded đạt200~3,09giây. DNS website~135ms.
+- Thử chỉ đọc với2worker đồng thời trong pod: Website, CR7, Card Credit, Fund
+  đều200, toàn batch4URL~12,37giây; mỗi probe vẫn deadline10giây. Điều này xác định
+  CPU contention lúc startup Python/TLS khiến8worker timeout giả. Không khẳng
+  định toàn bộ platform/nghiệp vụ healthy chỉ từ tập URL này.
+- Bản sửa: giới hạn thread pool collector còn2; giữ250m CPU, TLS/SSRF validation,
+  deadline hữu hạn, expected status, debounce và incident precedence. Regression
+  test chạy12resource kiểm tra tất cả được probe/giữ inventory và concurrency<=2.
+  Jenkins403 vẫn là availability failure thật; không dùng logo200 để làm xanh.
+- Local suite67tests PASS; render production/staging và `git diff --check` PASS.
+  Bản sửa chưa merge/deploy; cần rollout có phép và ít nhất2fresh observation để
+  xác minh sync tự phục hồi public status. Không sửa Secret hoặc component IDs.

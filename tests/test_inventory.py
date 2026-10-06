@@ -3,6 +3,7 @@ import importlib.util
 from pathlib import Path
 import socket
 import tempfile
+import threading
 import time
 import sys
 import unittest
@@ -53,6 +54,27 @@ def node(name='worker-a', ready='True', heartbeat=None, extra=(), unschedulable=
 
 
 class TestDiscoveryInventory(unittest.TestCase):
+    def test_probe_batch_limits_cpu_concurrency_without_skipping_inventory(self):
+        active = peak = total = 0
+        lock = threading.Lock()
+        def probe(*_):
+            nonlocal active, peak, total
+            with lock:
+                active += 1
+                peak = max(peak, active)
+                total += 1
+            try:
+                time.sleep(0.03)
+                return {'status':'operational','reason':'http_expected_status','observed_at':NOW}
+            finally:
+                with lock: active -= 1
+        inputs = [ingress('team', 'app-' + str(i), 'app-' + str(i) + '.apps.example.com') for i in range(12)]
+        output = inventory.collect_inventory(inputs, [], policy(), now=NOW, probe=probe)
+        self.assertEqual(len(output['rows']), 12)
+        self.assertEqual(total, 12)
+        self.assertLessEqual(peak, 2)
+        self.assertTrue(all(row['observation']['status'] == 'operational' for row in output['rows']))
+
     def test_configured_include_exclude_alias_secondary_and_duplicate_resources_group(self):
         p = policy()
         p['applications'] = [
