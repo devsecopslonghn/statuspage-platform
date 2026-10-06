@@ -149,3 +149,20 @@ Các lượt triển khai/rà soát và xử lý nhận xét chi tiết ở [REV
   của bản sửa này; `main` khớp `origin/main` trước triển khai.
 - Render production và server-side dry-run đạt cho toàn bộ manifests, bao gồm
   CA mount và Cilium egress mới. Không chạy unit/browser tests theo AGENTS.md.
+- Commit `296572c` được push lên main, Argo refresh và automated sync Succeeded.
+  Pod sync mới `statuspage-sync-77d55c9ffc-x9g2n`1/1; admin2/2, trang admin chuyển
+  hướng đến Keycloak login hoạt động. Cilium policy mới Valid=True.
+- Hai vòng sync mới quan sát cluster/storage Operational; vòng thứ hai tự cập
+  nhật Statuspage theo recovery threshold2. Heartbeat public200 với `ok=true`.
+- Watchdog thủ công run [37436803845](https://github.com/devsecopslonghn/statuspage-platform/actions/runs/37436803845)
+  success; public summary trả `All Systems Operational`, indicator `none`, không
+  còn component/group non-operational và không có active incident. CI validation
+  run [37436617268](https://github.com/devsecopslonghn/statuspage-platform/actions/runs/37436617268)
+  success.
+- Argo Healthy, sync operation Succeeded. Tổng sync status còn OutOfSync chỉ vì
+  hai ConfigMap hash cũ `statuspage-sync-code-7kbb665cfb` và
+  `statuspage-sync-config-gd4hm4h4h6` cần prune nhưng Application có `prune:false`.
+  Không xóa resource hoặc đổi chính sách prune; tất cả resource mong muốn đã sync.
+- Không khôi phục monitoring, không cấp token/RBAC cho sync, không tạo incident
+  hoặc gửi subscriber test notification. Kiểm chứng endpoint/runtime read-only;
+  chưa chạy unit/browser tests theo chỉ dẫn của repo.
